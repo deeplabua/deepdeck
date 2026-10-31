@@ -4,10 +4,10 @@ All notable changes to DeepDeck are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## 0.3.1 — 2026-10-31
+## 0.3.2 — 2026-10-31
 
-The 0.3.0 tag built no binaries (a masked release note emptied the build plan); 0.3.1 is the same
-release, published.
+The first published release of the 0.3 line. The 0.3.0 tag built no binaries (a masked release note
+emptied the build plan) and 0.3.1 stopped on a retired macOS runner; macOS builds now use macOS 15.
 
 ### Added
 
