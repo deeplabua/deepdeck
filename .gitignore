@@ -1,0 +1,5 @@
+/target/
+**/*.rs.bk
+.DS_Store
+# Raw hook payload dumps (may contain prompt text) — never commit
+/dumps/

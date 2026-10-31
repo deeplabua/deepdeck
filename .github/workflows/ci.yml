@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: fmt + clippy + test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v5
+
+      # rust-toolchain.toml pins the version; rustup installs it on first use.
+      - name: Install Rust
+        shell: bash
+        run: rustup show active-toolchain || rustup toolchain install
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Format
+        run: cargo fmt --all --check
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Test
+        run: cargo test --workspace
+
+      # The hook must stay fast and silent: feed it a recorded payload and
+      # check it prints nothing and exits 0.
+      - name: Hook smoke test
+        shell: bash
+        run: |
+          cargo build --release --quiet
+          out=$(DEEPDECK_HOME="$RUNNER_TEMP/dd" ./target/release/ddeck hook \
+            < crates/core/tests/fixtures/user_prompt_submit.json)
+          test -z "$out"
+          DEEPDECK_HOME="$RUNNER_TEMP/dd" ./target/release/ddeck status --all

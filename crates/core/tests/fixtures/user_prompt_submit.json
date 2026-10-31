@@ -1,0 +1,10 @@
+{
+  "session_id": "0b1e5c6a-7d2f-4c1e-9a55-3f0d8e2b7c41",
+  "transcript_path": "/Users/dev/.claude/projects/-Users-dev-Projects-demo/0b1e5c6a-7d2f-4c1e-9a55-3f0d8e2b7c41.jsonl",
+  "cwd": "/Users/dev/Projects/demo",
+  "scratchpad_dir": "/private/tmp/claude-501/-Users-dev-Projects-demo/0b1e5c6a-7d2f-4c1e-9a55-3f0d8e2b7c41/scratchpad",
+  "prompt_id": "5d0c9a3e-2b6f-4f8a-8e11-6c7a9b2d4e10",
+  "permission_mode": "default",
+  "hook_event_name": "UserPromptSubmit",
+  "prompt": "а вложения тоже переносим? Проверь, как это было сделано в Tauri-версии, там импорт шёл в два прохода: сначала метаданные, потом файлы. Если формат отличается — сделай адаптер и не трогай старый путь, он нужен для миграции со старых хранилищ. И ещё: прогресс показывай по байтам, а не по файлам."
+}

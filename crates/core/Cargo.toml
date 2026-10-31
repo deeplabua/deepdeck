@@ -1,0 +1,19 @@
+[package]
+name = "deepdeck-core"
+description = "Event log, hook parsing and board fold for DeepDeck."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+readme = "../../README.md"
+keywords = ["claude", "agents", "hooks", "tasks"]
+categories = ["development-tools"]
+
+[dependencies]
+jiff = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
