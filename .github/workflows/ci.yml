@@ -39,7 +39,7 @@ jobs:
         run: cargo clippy --workspace --all-targets -- -D warnings
 
       - name: Test
-        run: cargo test --workspace
+        run: cargo test --workspace --no-fail-fast
 
       # The hook must stay fast and silent: feed it a recorded payload and
       # check it prints nothing and exits 0.

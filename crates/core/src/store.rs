@@ -74,7 +74,9 @@ pub fn ensure_private_dir(dir: &Path) -> io::Result<()> {
 /// Open for appending, creating the file with owner-only permissions.
 pub fn open_append(path: &Path) -> io::Result<File> {
     let mut o = OpenOptions::new();
-    o.create(true).append(true);
+    // `read` too: Windows locks only handles with read or write access, and an
+    // append-only handle has neither.
+    o.create(true).read(true).append(true);
     open_private(path, o)
 }
 
