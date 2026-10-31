@@ -4,7 +4,10 @@ All notable changes to DeepDeck are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## 0.3.0 — 2026-10-31
+## 0.3.1 — 2026-10-31
+
+The 0.3.0 tag built no binaries (a masked release note emptied the build plan); 0.3.1 is the same
+release, published.
 
 ### Added
 
@@ -16,7 +19,7 @@ All notable changes to DeepDeck are recorded here. The format follows
   a release, a deploy, setting CI secrets; `ddeck cmd` lists them, `cmd run` runs one in the project root,
   `cmd show` prints it, `cmd rm` removes it. They appear under `commands` on the Projects screen, in the
   Timeline and in `ddeck list` (also `--json`), and survive log archiving. Anything that looks like a secret
-  value (tokens, keys, `PASSWORD=…`) is refused: refer to a vault or an environment variable instead.
+  value (a token, a key, a literal password) is refused: refer to a vault or an environment variable instead.
 - **`y` copies the selected line** in full — a saved command, a note, a prompt, a plan step — with `pbcopy`,
   `wl-copy`, `xclip`, `xsel` or `clip`, else through the terminal (OSC 52). Mouse capture had made the
   terminal's own selection impossible.
