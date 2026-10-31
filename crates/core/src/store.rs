@@ -204,6 +204,8 @@ fn update_registry(paths: &Paths, change: impl FnOnce(&mut Registry) -> bool) ->
         f.set_len(0)?;
         f.write_all(&serde_json::to_vec_pretty(&reg).map_err(io::Error::other)?)?;
         f.sync_all()?;
+        // Windows cannot rename a file that is still open.
+        drop(f);
         fs::rename(&tmp, &path)
     })();
     let _ = lock.unlock();
