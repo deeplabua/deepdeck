@@ -73,16 +73,23 @@ pub fn ensure_private_dir(dir: &Path) -> io::Result<()> {
 
 /// Open for appending, creating the file with owner-only permissions.
 pub fn open_append(path: &Path) -> io::Result<File> {
+    let mut o = OpenOptions::new();
+    o.create(true).append(true);
+    open_private(path, o)
+}
+
+/// Open (creating with owner-only permissions) with the given options.
+fn open_private(path: &Path, o: OpenOptions) -> io::Result<File> {
     if let Some(parent) = path.parent() {
         ensure_private_dir(parent)?;
     }
-    let mut o = OpenOptions::new();
-    o.create(true).append(true);
     #[cfg(unix)]
-    {
+    let o = {
         use std::os::unix::fs::OpenOptionsExt;
+        let mut o = o;
         o.mode(0o600);
-    }
+        o
+    };
     o.open(path)
 }
 
@@ -200,8 +207,10 @@ fn update_registry(paths: &Paths, change: impl FnOnce(&mut Registry) -> bool) ->
             return Ok(());
         }
         let tmp = path.with_extension("json.tmp");
-        let mut f = open_append(&tmp)?;
-        f.set_len(0)?;
+        // Not append mode: Windows cannot truncate a file opened for appending.
+        let mut o = OpenOptions::new();
+        o.create(true).write(true).truncate(true);
+        let mut f = open_private(&tmp, o)?;
         f.write_all(&serde_json::to_vec_pretty(&reg).map_err(io::Error::other)?)?;
         f.sync_all()?;
         // Windows cannot rename a file that is still open.
@@ -252,7 +261,10 @@ pub struct Rotated {
 /// would append to a deleted file. A crash between the two steps leaves
 /// duplicates in the archive, never a lost event. Lines that do not parse stay.
 pub fn rotate(log: &Path, cutoff: jiff::Timestamp) -> io::Result<Rotated> {
-    let mut f = match OpenOptions::new().read(true).append(true).open(log) {
+    // Read+write, not append: Windows cannot truncate a file opened for
+    // appending. Appenders use their own append handles, so their lines still
+    // land at the end.
+    let mut f = match OpenOptions::new().read(true).write(true).open(log) {
         Ok(f) => f,
         Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(Rotated::default()),
         Err(e) => return Err(e),
@@ -324,6 +336,7 @@ fn rotate_locked(f: &mut File, log: &Path, cutoff: jiff::Timestamp) -> io::Resul
         }
     }
     f.set_len(0)?;
+    f.seek(SeekFrom::Start(0))?;
     f.write_all(&rest)?;
     f.sync_all()?;
     Ok(Rotated {
