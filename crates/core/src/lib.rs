@@ -9,10 +9,13 @@ pub mod fold;
 pub mod hooks;
 pub mod model;
 pub mod project;
+pub mod runbook;
 pub mod store;
 
 pub use event::{Event, EventBody, NoteType, Source, TaskStatus};
-pub use fold::{fold, fold_project};
+pub use fold::{Order, fold, fold_project};
 pub use hooks::{HookEvent, parse_hook};
-pub use model::{AgentState, AgentView, Board, Note, ProjectView, SessionSummary, Task};
+pub use model::{
+    AgentState, AgentView, Board, Note, ProjectView, SavedCommand, SessionSummary, Task,
+};
 pub use project::{ProjectId, ProjectMeta};

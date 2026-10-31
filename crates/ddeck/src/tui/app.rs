@@ -4,7 +4,7 @@
 use std::collections::HashSet;
 
 use deepdeck_core::event::note_id;
-use deepdeck_core::{Board, EventBody, NoteType, ProjectId};
+use deepdeck_core::{Board, EventBody, NoteType, Order, ProjectId};
 use jiff::Timestamp;
 use ratatui::crossterm::event::{
     KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
@@ -12,6 +12,7 @@ use ratatui::crossterm::event::{
 
 use super::input::{InputLine, InputOutcome};
 use super::projects::Item;
+use super::select::Selection;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Screen {
@@ -26,6 +27,17 @@ pub enum Effect {
     Quit,
     /// Append user events to this project's log, in order.
     Write(ProjectId, Vec<EventBody>),
+    /// Copy this text to the clipboard.
+    Copy(String),
+    /// The project order changed: remember it.
+    SaveOrder(Order),
+    /// Copy what this mouse selection covers on screen.
+    CopySelection(super::select::Selection),
+    /// Switch to the agent's herdr pane (recorded pane, else found by `root`).
+    Focus {
+        pane: Option<String>,
+        root: std::path::PathBuf,
+    },
 }
 
 pub struct App {
@@ -47,10 +59,15 @@ pub struct App {
     /// Timeline: lines scrolled from the top, and the project filter (`f`).
     pub timeline_scroll: usize,
     pub timeline_filter: Option<ProjectId>,
+    /// Mouse selection in progress or just copied (shown reversed).
+    pub drag: Option<Selection>,
+    /// How projects are listed; `s` toggles.
+    pub order: Order,
 }
 
 impl App {
-    pub fn new(board: Board, hooks_installed: bool) -> Self {
+    pub fn new(mut board: Board, hooks_installed: bool) -> Self {
+        board.sort(Order::default());
         App {
             board,
             screen: Screen::Projects,
@@ -65,7 +82,20 @@ impl App {
             hooks_installed,
             timeline_scroll: 0,
             timeline_filter: None,
+            drag: None,
+            order: Order::default(),
         }
+    }
+
+    /// A fresh board from the logs, in the chosen order.
+    pub fn set_board(&mut self, mut board: Board) {
+        board.sort(self.order);
+        self.board = board;
+    }
+
+    pub fn set_order(&mut self, order: Order) {
+        self.order = order;
+        self.board.sort(order);
     }
 
     /// After a layout: remember item order and keep the cursor on something real.
@@ -114,6 +144,7 @@ impl App {
     }
 
     pub fn handle_key(&mut self, key: KeyEvent, now: Timestamp) -> Option<Effect> {
+        self.drag = None;
         if key.modifiers.contains(KeyModifiers::CONTROL)
             && key.code == KeyCode::Char('c')
             && self.input.is_none()
@@ -177,6 +208,23 @@ impl App {
             KeyCode::Char('k') | KeyCode::Up => self.move_cursor(-1),
             KeyCode::Char('g') | KeyCode::Home => self.move_cursor(isize::MIN),
             KeyCode::Char('G') | KeyCode::End => self.move_cursor(isize::MAX),
+            KeyCode::Char('o') => return self.focus_selected(),
+            KeyCode::Char('s') => {
+                self.set_order(match self.order {
+                    Order::Name => Order::Attention,
+                    Order::Attention => Order::Name,
+                });
+                return Some(Effect::SaveOrder(self.order));
+            }
+            KeyCode::Char('y') => {
+                let item = self.selected.as_ref()?;
+                let p = self
+                    .board
+                    .projects
+                    .iter()
+                    .find(|p| &p.meta.id == item.project())?;
+                return super::projects::item_text(p, item, &super::strings::EN).map(Effect::Copy);
+            }
             KeyCode::Char(c @ ('a' | '?' | 'i')) => {
                 let kind = match c {
                     'a' => NoteType::Task,
@@ -225,30 +273,72 @@ impl App {
                     .find(|(_, x)| ev.row == 0 && x.contains(&ev.column))
                 {
                     self.screen = *screen;
+                    self.drag = None;
                     return None;
                 }
-                if self.screen == Screen::Timeline || ev.row < self.body_top {
-                    return None;
+                // Click or the start of a selection: decided on release.
+                self.drag = Some(Selection::at((ev.column, ev.row)));
+            }
+            MouseEventKind::Drag(MouseButton::Left) => {
+                if let Some(sel) = &mut self.drag {
+                    sel.head = (ev.column, ev.row);
                 }
-                let line = usize::from(ev.row - self.body_top) + self.scroll;
-                // The item whose lines contain the click: the last one starting at or above it.
-                let (item, _) = self
-                    .rows
-                    .iter()
-                    .rev()
-                    .find(|(_, start)| *start <= line)?
-                    .clone();
-                if self.selected.as_ref() == Some(&item) {
-                    if !self.open.remove(&item) {
-                        self.open.insert(item);
-                    }
-                } else {
-                    self.selected = Some(item);
+            }
+            MouseEventKind::Up(MouseButton::Left) => {
+                let sel = self.drag?;
+                if !sel.is_empty() {
+                    // Stays highlighted until the next click or key.
+                    return Some(Effect::CopySelection(sel));
                 }
+                self.drag = None;
+                return self.click(ev.row);
             }
             _ => {}
         }
         None
+    }
+
+    /// A click on a line selects it; on the selected line, opens or closes it.
+    fn click(&mut self, row: u16) -> Option<Effect> {
+        if self.screen == Screen::Timeline || row < self.body_top {
+            return None;
+        }
+        let line = usize::from(row - self.body_top) + self.scroll;
+        // The item whose lines contain the click: the last one starting at or above it.
+        let (item, _) = self
+            .rows
+            .iter()
+            .rev()
+            .find(|(_, start)| *start <= line)?
+            .clone();
+        if self.selected.as_ref() == Some(&item) {
+            if !self.open.remove(&item) {
+                self.open.insert(item);
+            }
+        } else {
+            self.selected = Some(item);
+        }
+        None
+    }
+
+    /// The agent behind the selected line: a plan step's own session, otherwise
+    /// the project's headline agent (the one waiting, if any).
+    fn focus_selected(&self) -> Option<Effect> {
+        let item = self.selected.as_ref()?;
+        let p = self
+            .board
+            .projects
+            .iter()
+            .find(|p| &p.meta.id == item.project())?;
+        let agent = match item {
+            Item::Task(_, session, _) => p.agents.iter().find(|a| &a.session == session),
+            _ => None,
+        }
+        .or_else(|| p.headline());
+        Some(Effect::Focus {
+            pane: agent.and_then(|a| a.herdr_pane.clone()),
+            root: p.meta.root.clone(),
+        })
     }
 
     fn note_key(&mut self, code: KeyCode, project: ProjectId, id: String) -> Option<Effect> {
@@ -383,6 +473,105 @@ mod tests {
     }
 
     #[test]
+    fn projects_stay_in_name_order_until_s() {
+        let meta = |n: &str| ProjectMeta::for_root(Path::new(n));
+        let waiting = Event::new(
+            now(),
+            Source::Claude,
+            Some("s".into()),
+            EventBody::AgentWaiting {
+                text: "?".into(),
+                reason: None,
+            },
+        );
+        let board = fold([
+            (meta("/p/alpha"), vec![]),
+            (meta("/p/Beta"), vec![]),
+            (meta("/p/zeta"), vec![waiting]),
+        ]);
+        let names = |app: &App| -> Vec<String> {
+            app.board
+                .projects
+                .iter()
+                .map(|p| p.meta.name.clone())
+                .collect()
+        };
+        let mut app = App::new(board.clone(), true);
+        assert_eq!(names(&app), ["alpha", "Beta", "zeta"]);
+        // A new board from the logs keeps the order.
+        app.set_board(board.clone());
+        assert_eq!(names(&app), ["alpha", "Beta", "zeta"]);
+        assert_eq!(
+            app.handle_key(key('s'), now()),
+            Some(Effect::SaveOrder(Order::Attention))
+        );
+        assert_eq!(names(&app)[0], "zeta");
+        app.set_board(board);
+        assert_eq!(names(&app)[0], "zeta");
+        assert_eq!(
+            app.handle_key(key('s'), now()),
+            Some(Effect::SaveOrder(Order::Name))
+        );
+        assert_eq!(names(&app), ["alpha", "Beta", "zeta"]);
+    }
+
+    #[test]
+    fn y_copies_the_full_text_of_the_line() {
+        let (mut app, id) = app();
+        app.selected = Some(Item::Note(id.clone(), "n1".into()));
+        assert_eq!(
+            app.handle_key(key('y'), now()),
+            Some(Effect::Copy("csv".into()))
+        );
+        app.selected = Some(Item::Project(id));
+        assert_eq!(
+            app.handle_key(key('y'), now()),
+            Some(Effect::Copy("/p/DeepVault".into()))
+        );
+        app.selected = None;
+        assert_eq!(app.handle_key(key('y'), now()), None);
+    }
+
+    #[test]
+    fn o_focuses_the_agent_behind_the_line() {
+        let meta = ProjectMeta::for_root(Path::new("/p/DeepVault"));
+        let id = meta.id.clone();
+        let ev =
+            |session: &str, body| Event::new(now(), Source::Claude, Some(session.into()), body);
+        let started = |pane: Option<&str>| EventBody::AgentStarted {
+            source: "startup".into(),
+            herdr_pane: pane.map(Into::into),
+        };
+        let events = vec![
+            ev("a", started(Some("wE:p1"))),
+            ev("b", started(Some("wE:p2"))),
+            ev(
+                "b",
+                EventBody::AgentWaiting {
+                    text: "permission".into(),
+                    reason: None,
+                },
+            ),
+        ];
+        let mut app = App::new(fold([(meta.clone(), events)]), true);
+        let focus = |pane: &str| {
+            Some(Effect::Focus {
+                pane: Some(pane.into()),
+                root: meta.root.clone(),
+            })
+        };
+        // The project line goes to the agent waiting for you.
+        app.set_items(vec![Item::Project(id.clone())]);
+        assert_eq!(app.handle_key(key('o'), now()), focus("wE:p2"));
+        // A plan step goes to its own session.
+        app.selected = Some(Item::Task(id.clone(), "a".into(), "1".into()));
+        assert_eq!(app.handle_key(key('o'), now()), focus("wE:p1"));
+        // Nothing selected: nothing to do.
+        app.selected = None;
+        assert_eq!(app.handle_key(key('o'), now()), None);
+    }
+
+    #[test]
     fn empty_input_and_escape_write_nothing() {
         let (mut app, _) = app();
         app.handle_key(key('?'), now());
@@ -480,24 +669,42 @@ mod tests {
         let note = Item::Note(id.clone(), "n1".into());
         app.rows = vec![(Item::Project(id.clone()), 0), (note.clone(), 3)];
         app.tabs = vec![(Screen::Projects, 10..20), (Screen::Inbox, 30..38)];
-        let click = |col, row| MouseEvent {
-            kind: MouseEventKind::Down(MouseButton::Left),
+        let ev = |kind, col, row| MouseEvent {
+            kind,
             column: col,
             row,
             modifiers: KeyModifiers::NONE,
         };
-        // Row 1 + 4 = content line 4: inside the note (starts at 3).
-        app.handle_mouse(click(5, 5));
-        assert_eq!(app.selected, Some(note.clone()));
-        app.handle_mouse(click(5, 4));
-        assert!(app.open.contains(&note));
-        app.handle_mouse(click(32, 0));
-        assert_eq!(app.screen, Screen::Inbox);
-        let wheel = MouseEvent {
-            kind: MouseEventKind::ScrollUp,
-            ..click(0, 3)
+        let down = |col, row| ev(MouseEventKind::Down(MouseButton::Left), col, row);
+        let drag = |col, row| ev(MouseEventKind::Drag(MouseButton::Left), col, row);
+        let up = |col, row| ev(MouseEventKind::Up(MouseButton::Left), col, row);
+        let click = |app: &mut App, col, row| {
+            app.handle_mouse(down(col, row));
+            app.handle_mouse(up(col, row))
         };
-        app.handle_mouse(wheel);
+        // Row 1 + 4 = content line 4: inside the note (starts at 3).
+        click(&mut app, 5, 5);
+        assert_eq!(app.selected, Some(note.clone()));
+        click(&mut app, 5, 4);
+        assert!(app.open.contains(&note));
+
+        // A drag selects text instead: copied on release, nothing toggled.
+        app.handle_mouse(down(2, 4));
+        app.handle_mouse(drag(9, 5));
+        let sel = Selection {
+            anchor: (2, 4),
+            head: (9, 5),
+        };
+        assert_eq!(app.handle_mouse(up(9, 5)), Some(Effect::CopySelection(sel)));
+        assert!(app.open.contains(&note));
+        assert_eq!(app.drag, Some(sel));
+        // Any key clears the highlight.
+        app.handle_key(key('j'), now());
+        assert_eq!(app.drag, None);
+
+        click(&mut app, 32, 0);
+        assert_eq!(app.screen, Screen::Inbox);
+        app.handle_mouse(ev(MouseEventKind::ScrollUp, 0, 3));
         assert_eq!(app.selected, Some(Item::Project(id)));
     }
 

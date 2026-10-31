@@ -1,7 +1,9 @@
 //! Events → board. Pure functions; the only input is the log.
 
 use crate::event::{Event, EventBody, TaskStatus};
-use crate::model::{AgentState, AgentView, Board, Note, ProjectView, SessionSummary, Task};
+use crate::model::{
+    AgentState, AgentView, Board, Note, ProjectView, SavedCommand, SessionSummary, Task,
+};
 use crate::project::ProjectMeta;
 
 /// How many recent prompts an agent keeps for `ddeck retract`.
@@ -17,19 +19,48 @@ pub fn fold(projects: impl IntoIterator<Item = (ProjectMeta, Vec<Event>)>) -> Bo
     )
 }
 
+/// How the board lists projects.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Order {
+    /// By name: projects stay where they are.
+    #[default]
+    Name,
+    /// Waiting for you → working → idle → ended, then most recent first.
+    Attention,
+}
+
 impl Board {
+    /// Re-sort in place; the fold itself returns [`Order::Attention`].
+    pub fn sort(&mut self, order: Order) {
+        match order {
+            Order::Attention => sort_by_attention(&mut self.projects),
+            Order::Name => self.projects.sort_by(|a, b| {
+                a.meta
+                    .name
+                    .to_lowercase()
+                    .cmp(&b.meta.name.to_lowercase())
+                    .then(a.meta.root.cmp(&b.meta.root))
+            }),
+        }
+    }
+
     /// Board from already folded projects (the TUI re-folds only what changed).
     /// Sorted: waiting for you → working → idle/done → ended, then most recent first.
     pub fn from_projects(mut projects: Vec<ProjectView>) -> Board {
-        projects.sort_by(|a, b| {
-            let rank = |p: &ProjectView| p.headline().map_or(u8::MAX, |a| a.state.rank());
-            rank(a)
-                .cmp(&rank(b))
-                .then(b.last_activity.cmp(&a.last_activity))
-                .then(a.meta.name.cmp(&b.meta.name))
-        });
+        sort_by_attention(&mut projects);
         Board { projects }
     }
+}
+
+fn sort_by_attention(projects: &mut [ProjectView]) {
+    projects.sort_by(|a, b| {
+        let rank = |p: &ProjectView| p.headline().map_or(u8::MAX, |a| a.state.rank());
+        rank(a)
+            .cmp(&rank(b))
+            .then(b.last_activity.cmp(&a.last_activity))
+            .then(a.meta.name.cmp(&b.meta.name))
+    });
 }
 
 /// Fold one project's log (in log order).
@@ -38,6 +69,7 @@ pub fn fold_project(meta: ProjectMeta, events: &[Event]) -> ProjectView {
     let mut notes: Vec<Note> = Vec::new();
     let mut done_notes: Vec<Note> = Vec::new();
     let mut roadmap: Vec<Task> = Vec::new();
+    let mut commands: Vec<SavedCommand> = Vec::new();
     let mut last_activity = None;
 
     for e in events {
@@ -99,6 +131,18 @@ pub fn fold_project(meta: ProjectMeta, events: &[Event]) -> ProjectView {
                     t.status = *status;
                 }
             }
+            EventBody::CmdSet { name, command } => {
+                let cmd = SavedCommand {
+                    name: name.clone(),
+                    command: command.clone(),
+                    at: e.ts,
+                };
+                match commands.iter_mut().find(|c| &c.name == name) {
+                    Some(c) => *c = cmd,
+                    None => commands.push(cmd),
+                }
+            }
+            EventBody::CmdDelete { name } => commands.retain(|c| &c.name != name),
             body => {
                 let Some(session) = &e.session else { continue };
                 let agent = agent_mut(&mut agents, session, e);
@@ -126,6 +170,7 @@ pub fn fold_project(meta: ProjectMeta, events: &[Event]) -> ProjectView {
         done_notes,
         last_summary,
         roadmap,
+        commands,
         last_activity,
     }
 }
@@ -215,7 +260,9 @@ fn apply_agent(agent: &mut AgentView, body: &EventBody, e: &Event) {
         | EventBody::NoteDelete { .. }
         | EventBody::NoteReopen { .. }
         | EventBody::RoadmapSet { .. }
-        | EventBody::RoadmapStep { .. } => {}
+        | EventBody::RoadmapStep { .. }
+        | EventBody::CmdSet { .. }
+        | EventBody::CmdDelete { .. } => {}
     }
 }
 

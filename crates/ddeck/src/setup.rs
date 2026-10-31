@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result, bail};
 
 /// Bump when the block text changes, so `setup` and `doctor` see stale copies.
-pub const BLOCK_VERSION: u32 = 4;
+pub const BLOCK_VERSION: u32 = 5;
 const BEGIN_PREFIX: &str = "<!-- ddeck:begin";
 const END: &str = "<!-- ddeck:end -->";
 
@@ -26,6 +26,7 @@ The user follows your work on a task board. Keep it current:
 - A question only the user can answer: `ddeck ask \"…\"`, then continue with a safe default if you can.
 - An idea or fix deferred for later: `ddeck idea \"…\"`.
 - If the user confirms their message was meant for another session, run `ddeck retract \"<a few words from it>\"` (when they name where it belonged, add `--to <that project>`).
+- A command the user will need again (a release, a deploy, setting CI secrets): save it with `ddeck cmd add \"<name>\" '<command>'`; `ddeck cmd` lists the saved ones — check there before asking how. Refer to secrets (`dv run --item …`, `$NAME`), never paste their values.
 - When you finish a piece of work (a commit, the end of a task), save a 2–4 sentence summary — what was done, what was decided, what is left: `ddeck summary \"…\"`.
 - Before starting work in a project, read `ddeck list`: open items, the roadmap and what the last session left.
 
@@ -219,6 +220,7 @@ mod tests {
             "ddeck idea",
             "ddeck retract",
             "ddeck summary",
+            "ddeck cmd add",
             "ddeck list",
         ] {
             assert!(b.contains(cmd), "{cmd}");

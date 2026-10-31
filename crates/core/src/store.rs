@@ -50,6 +50,11 @@ impl Paths {
         self.root.join("logs")
     }
 
+    /// Board preferences (`{"order": "name"}`).
+    pub fn tui_prefs(&self) -> PathBuf {
+        self.root.join("tui.json")
+    }
+
     pub fn hook_log(&self) -> PathBuf {
         self.logs_dir().join("hook.log")
     }

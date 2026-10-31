@@ -3,7 +3,7 @@
 
 use std::collections::HashSet;
 
-use deepdeck_core::{AgentState, Board, NoteType, ProjectId, ProjectView, TaskStatus};
+use deepdeck_core::{AgentState, AgentView, Board, NoteType, ProjectId, ProjectView, TaskStatus};
 use jiff::Timestamp;
 use ratatui::text::{Line, Span};
 
@@ -32,6 +32,8 @@ pub enum Item {
     /// A project roadmap step, 1-based.
     Roadmap(ProjectId, usize),
     Note(ProjectId, String),
+    /// A saved project command, by name.
+    Command(ProjectId, String),
 }
 
 impl Item {
@@ -43,6 +45,7 @@ impl Item {
             | Item::Prompt(p)
             | Item::Recap(p)
             | Item::Roadmap(p, _)
+            | Item::Command(p, _)
             | Item::Note(p, _) => p,
         }
     }
@@ -150,6 +153,65 @@ fn is_quiet(p: &ProjectView) -> bool {
                 && a.last_prompt.is_none()
                 && a.last_recap.is_none()
         })
+}
+
+/// Between turns: the agent's own summary beats the recap of its last reply;
+/// a fresh session shows what the previous one left. (Label, text.)
+fn resting_line<'a>(
+    p: &'a ProjectView,
+    agent: &'a AgentView,
+    t: &Strings,
+) -> Option<(&'static str, &'a str)> {
+    let resting = matches!(
+        agent.state,
+        AgentState::Stopped { .. } | AgentState::Idle { .. } | AgentState::Ended { .. }
+    );
+    let previous = p
+        .last_summary
+        .as_ref()
+        .filter(|s| s.session != agent.session);
+    match (&agent.summary, &agent.last_recap, previous) {
+        (Some(s), _, _) if resting => Some((t.summary, s.as_str())),
+        (None, Some(recap), _) if resting => Some((t.recap, recap.as_str())),
+        (None, None, Some(prev)) if agent.last_prompt.is_none() => {
+            Some((t.last_session, prev.text.as_str()))
+        }
+        _ => None,
+    }
+}
+
+/// The full text behind a line, as shown when it is opened — what `y` copies.
+pub fn item_text(p: &ProjectView, item: &Item, t: &Strings) -> Option<String> {
+    let head = p.headline();
+    match item {
+        Item::Project(_) => Some(p.meta.root.display().to_string()),
+        Item::Waiting(_) => match &head?.state {
+            AgentState::Waiting { text, .. } => Some(text.clone()),
+            _ => None,
+        },
+        Item::Task(_, session, id) => p
+            .agents
+            .iter()
+            .find(|a| &a.session == session)?
+            .tasks
+            .iter()
+            .find(|task| &task.id == id)
+            .map(|task| task.subject.clone()),
+        Item::Prompt(_) => head?.last_prompt.clone(),
+        Item::Recap(_) => resting_line(p, head?, t).map(|(_, text)| text.to_owned()),
+        Item::Roadmap(_, n) => p.roadmap.get(n.checked_sub(1)?).map(|s| s.subject.clone()),
+        Item::Note(_, id) => p
+            .notes
+            .iter()
+            .chain(&p.done_notes)
+            .find(|n| &n.id == id)
+            .map(|n| n.text.clone()),
+        Item::Command(_, name) => p
+            .commands
+            .iter()
+            .find(|c| &c.name == name)
+            .map(|c| c.command.clone()),
+    }
 }
 
 /// Selection gutter: one column at the left edge.
@@ -313,24 +375,7 @@ fn project_block(
                 width,
             );
         }
-        // Between turns: the agent's own summary beats the recap of its last reply;
-        // a fresh session shows what the previous one left.
-        let resting = matches!(
-            agent.state,
-            AgentState::Stopped { .. } | AgentState::Idle { .. } | AgentState::Ended { .. }
-        );
-        let previous = p
-            .last_summary
-            .as_ref()
-            .filter(|s| s.session != agent.session);
-        let line = match (&agent.summary, &agent.last_recap, previous) {
-            (Some(s), _, _) if resting => Some((t.summary, s.as_str())),
-            (None, Some(recap), _) if resting => Some((t.recap, recap.as_str())),
-            (None, None, Some(prev)) if agent.last_prompt.is_none() => {
-                Some((t.last_session, prev.text.as_str()))
-            }
-            _ => None,
-        };
+        let line = resting_line(p, agent, t);
         if let Some((label, text)) = line {
             item_lines(
                 r,
@@ -463,6 +508,30 @@ fn project_block(
                 None,
                 width,
             ));
+        }
+    }
+
+    // ── saved commands: the project's runbook (`ddeck cmd run <name>`) ──
+    if !p.commands.is_empty() {
+        r.lines.push(row(
+            vec![Span::raw("   ")],
+            t.commands,
+            th.accent(),
+            Some(Span::styled(p.commands.len().to_string(), th.dim())),
+            width,
+        ));
+        for c in &p.commands {
+            item_lines(
+                r,
+                Item::Command(p.meta.id.clone(), c.name.clone()),
+                view,
+                th,
+                vec![Span::raw("    "), Span::styled("$ ", th.accent())],
+                &format!("{} · {}", c.name, c.command),
+                Style::new(),
+                None,
+                width,
+            );
         }
     }
 }
@@ -674,6 +743,60 @@ mod tests {
             .collect();
         // DeepVault: project, waiting, 3 tasks, prompt, 2 notes; DeepSnap: project, prompt, recap.
         assert_eq!(kinds.len(), 1 + 1 + 3 + 1 + 2 + 1 + 1 + 1);
+    }
+
+    #[test]
+    fn commands_section_lists_the_runbook() {
+        let set = |m: i64, name: &str, command: &str| {
+            Event::new(
+                at(m),
+                Source::User,
+                None,
+                EventBody::CmdSet {
+                    name: name.into(),
+                    command: command.into(),
+                },
+            )
+        };
+        let note = Event::new(
+            at(0),
+            Source::User,
+            None,
+            EventBody::NoteAdd {
+                id: "n1".into(),
+                note_type: NoteType::Idea,
+                text: "zstd".into(),
+            },
+        );
+        let b = fold([(
+            ProjectMeta::for_root(Path::new("/p/DeepDeck")),
+            vec![
+                note,
+                set(
+                    1,
+                    "release",
+                    "scripts/sync-public.sh main \"Release 0.3.0\"",
+                ),
+                set(2, "test", "cargo test"),
+            ],
+        )]);
+        let (lines, r) = render(&b, 40, None);
+        assert_eq!(
+            lines[1..],
+            [
+                "   ideas                             0/1",
+                "     ◆ zstd",
+                "   commands                            2",
+                "     $ release · scripts/sync-public.sh…",
+                "     $ test · cargo test",
+            ]
+        );
+        let id = b.projects[0].meta.id.clone();
+        assert!(
+            r.items
+                .iter()
+                .any(|(i, _)| *i == Item::Command(id.clone(), "test".into()))
+        );
     }
 
     #[test]

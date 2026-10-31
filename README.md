@@ -101,12 +101,17 @@ Run `ddeck` in a side panel (60 columns is plenty). Three screens:
 | `j` `k` / `↑` `↓` | Move |
 | `↵` | Expand or collapse (a plan, a long prompt, a project's done items) |
 | `␣` | Mark done / reopen |
+| `o` | Jump to the agent's pane in herdr (the waiting one, or the plan step's own) |
+| `y` | Copy the selected line in full (a command, a note, a prompt, a step) |
+| `s` | Projects by name (default, they stay put) / by attention (waiting first); remembered |
 | `a` `?` `i` | Add a task, question or idea |
 | `e` / `d` | Edit / delete |
 | `f` | Timeline: this project / all |
 | `q` | Quit |
 
-The mouse works too: click to select, click again to expand, scroll the wheel, click a tab.
+The mouse works too: click to select, click again to expand, scroll the wheel, click a tab. Drag to select
+text — it is copied when you let go (the board holds the mouse, so the terminal's own selection is off);
+`y` copies the selected line in full, including what is cut off on screen.
 
 The board reloads itself when the binary changes, so an upgrade does not need a restart.
 
@@ -129,7 +134,25 @@ ddeck done <id>
 ddeck summary "Added --since; decided to keep -s; left: tests."
 ddeck list                                             # the project's plan and open items (--json)
 ddeck retract "a few words"                            # a message sent to the wrong session
+ddeck cmd add "release" 'scripts/release.sh 0.3.0'     # a project command worth keeping
 ```
+
+### Saved commands
+
+Each project keeps a short runbook — the commands you or an agent will need again: a release, a deploy,
+setting CI secrets. They show on the board under `commands` and in `ddeck list`.
+
+```sh
+ddeck cmd add "ci secrets" 'dv run --item "Release" --sh '\''printf %s "$TOKEN" | gh secret set TOKEN'\'''
+ddeck cmd                 # list
+ddeck cmd run release     # run in the project root (a unique prefix is enough)
+ddeck cmd show release    # print it
+ddeck cmd rm release
+```
+
+The log is plain text, so a command must refer to secrets — a vault (`dv run --item …`) or an environment
+variable — never contain them. `cmd add` refuses anything that looks like a token or a password
+(`--force` if it is a false alarm).
 
 Commands find the project from the current directory (the nearest `.git` or `.jj` root); `--project
 <path>` points elsewhere.

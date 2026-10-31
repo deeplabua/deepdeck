@@ -38,6 +38,12 @@ pub struct Strings {
     pub kind_idea: &'static str,
     pub input_hint: &'static str,
     pub edit_label: &'static str,
+    /// After `y`: "copied · pbcopy".
+    pub copied: fn(&str) -> String,
+    /// After `s`: the new project order.
+    pub sorted: fn(deepdeck_core::Order) -> String,
+    /// `o` pressed outside herdr.
+    pub herdr_outside: &'static str,
 
     /// Footer: (key, action) pairs.
     pub keys: &'static [(&'static str, &'static str)],
@@ -50,6 +56,10 @@ pub struct Strings {
     pub tl_plan: fn(usize) -> String,
     /// "roadmap: 4 steps".
     pub tl_roadmap: fn(usize) -> String,
+    /// "saved command: release".
+    pub tl_cmd: fn(&str) -> String,
+    /// Section label for saved commands on the Projects screen.
+    pub commands: &'static str,
     /// Section label on the Projects screen.
     pub roadmap: &'static str,
     /// Divider where the conversation switched projects: (ago, project).
@@ -110,8 +120,17 @@ pub const EN: Strings = Strings {
     kind_idea: "idea",
     input_hint: "tab project · ↵ save · esc cancel",
     edit_label: "edit",
+    copied: |how| format!("copied · {how}"),
+    sorted: |order| match order {
+        deepdeck_core::Order::Name => "projects by name — s: by attention".to_owned(),
+        deepdeck_core::Order::Attention => "projects by attention — s: by name".to_owned(),
+    },
+    herdr_outside: "o jumps to the agent in herdr — run ddeck in a herdr pane",
 
     keys: &[
+        ("o", "agent"),
+        ("y", "copy"),
+        ("s", "sort"),
         ("a", "task"),
         ("?", "question"),
         ("i", "idea"),
@@ -128,6 +147,8 @@ pub const EN: Strings = Strings {
         ("q", "quit"),
     ],
     keys_inbox: &[
+        ("o", "agent"),
+        ("y", "copy"),
         ("↵", "open"),
         ("␣", "resolved"),
         ("m", "→ task"),
@@ -144,6 +165,8 @@ pub const EN: Strings = Strings {
             format!("plan: {n} steps")
         }
     },
+    tl_cmd: |name| format!("saved command: {name}"),
+    commands: "commands",
     tl_roadmap: |n| {
         if n == 1 {
             "roadmap: 1 step".to_owned()

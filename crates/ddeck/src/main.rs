@@ -1,7 +1,9 @@
 //! `ddeck` — DeepDeck command line.
 
 mod cli;
+mod clipboard;
 mod doctor;
+mod herdr;
 mod hook;
 mod install;
 mod setup;
@@ -63,6 +65,13 @@ enum Command {
     Roadmap {
         #[command(subcommand)]
         action: Option<RoadmapAction>,
+        #[arg(long, value_name = "PATH", global = true)]
+        project: Option<PathBuf>,
+    },
+    /// Saved project commands (runbook). Without a subcommand, lists them.
+    Cmd {
+        #[command(subcommand)]
+        action: Option<CmdAction>,
         #[arg(long, value_name = "PATH", global = true)]
         project: Option<PathBuf>,
     },
@@ -170,6 +179,24 @@ enum Command {
 }
 
 #[derive(Subcommand)]
+enum CmdAction {
+    /// Save a command under a name (replaces one with the same name). Refer to secrets, never paste them.
+    Add {
+        name: String,
+        command: String,
+        /// Save even if it looks like it contains a secret value.
+        #[arg(long)]
+        force: bool,
+    },
+    /// Run a saved command in the project root (name or unique prefix).
+    Run { name: String },
+    /// Print a saved command, e.g. to copy it.
+    Show { name: String },
+    /// Remove a saved command.
+    Rm { name: String },
+}
+
+#[derive(Subcommand)]
 enum RoadmapAction {
     /// Replace the roadmap with these steps.
     Set {
@@ -273,6 +300,26 @@ fn run(command: Command) -> Result<ExitCode> {
                 Some(RoadmapAction::Step { n, state }) => say(cli::roadmap_step(&ctx, n, state)?),
                 None => {
                     print!("{}", cli::list(&ctx, false)?);
+                    Ok(ExitCode::SUCCESS)
+                }
+            }
+        }
+        Command::Cmd { action, project } => {
+            let ctx = ctx(project)?;
+            match action {
+                Some(CmdAction::Add {
+                    name,
+                    command,
+                    force,
+                }) => say(cli::cmd_add(&ctx, &name, &command, force)?),
+                Some(CmdAction::Rm { name }) => say(cli::cmd_rm(&ctx, &name)?),
+                Some(CmdAction::Show { name }) => say(cli::cmd_get(&ctx, &name)?.command),
+                Some(CmdAction::Run { name }) => {
+                    let code = cli::cmd_run(&ctx, &name)?;
+                    Ok(ExitCode::from(u8::try_from(code).unwrap_or(1)))
+                }
+                None => {
+                    print!("{}", cli::cmd_list(&ctx)?);
                     Ok(ExitCode::SUCCESS)
                 }
             }

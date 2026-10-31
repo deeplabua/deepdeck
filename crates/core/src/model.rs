@@ -22,6 +22,14 @@ impl Board {
     }
 }
 
+/// A runbook entry: a command worth keeping for this project.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SavedCommand {
+    pub name: String,
+    pub command: String,
+    pub at: Timestamp,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct ProjectView {
     pub meta: ProjectMeta,
@@ -36,6 +44,8 @@ pub struct ProjectView {
     pub last_summary: Option<SessionSummary>,
     /// Project roadmap (ids "1".."n"), independent of sessions.
     pub roadmap: Vec<Task>,
+    /// Saved project commands (the runbook), in the order first added.
+    pub commands: Vec<SavedCommand>,
     pub last_activity: Option<Timestamp>,
 }
 

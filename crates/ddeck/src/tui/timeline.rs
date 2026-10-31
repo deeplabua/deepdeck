@@ -167,6 +167,8 @@ pub fn layout_timeline(
                 | EventBody::NoteReopen { .. }
                 | EventBody::PromptRetract { .. } => None,
                 EventBody::SessionSummary { text } => Some(entry("Σ", th.accent(), text.clone())),
+                EventBody::CmdSet { name, .. } => Some(entry("$", th.accent(), (t.tl_cmd)(name))),
+                EventBody::CmdDelete { .. } => None,
                 EventBody::RoadmapSet { steps } => {
                     roadmap = steps.iter().map(|s| s.subject.clone()).collect();
                     Some(entry("◇", th.accent(), (t.tl_roadmap)(steps.len())))

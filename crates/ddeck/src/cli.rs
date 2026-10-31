@@ -356,6 +356,9 @@ pub fn render_list(view: &ProjectView, session: &str, as_json: bool) -> String {
             "plan": plan.iter().enumerate().map(|(i, t)| json!({
                 "step": i + 1, "subject": t.subject, "status": status(t.status)
             })).collect::<Vec<_>>(),
+            "commands": view.commands.iter().map(|c| json!({
+                "name": c.name, "command": c.command
+            })).collect::<Vec<_>>(),
             "notes": view.notes.iter().map(|n| json!({
                 "id": n.id,
                 "type": match n.note_type { NoteType::Task => "task", NoteType::Question => "question", NoteType::Idea => "idea" },
@@ -402,6 +405,12 @@ pub fn render_list(view: &ProjectView, session: &str, as_json: bool) -> String {
             out.push_str(&format!("  {} {m} {}\n", i + 1, t.subject));
         }
     }
+    if !view.commands.is_empty() {
+        out.push_str("commands (ddeck cmd run <name>)\n");
+        for c in &view.commands {
+            out.push_str(&format!("  $ {}  {}\n", c.name, c.command));
+        }
+    }
     for n in &view.notes {
         let m = match n.note_type {
             NoteType::Question => "?",
@@ -413,11 +422,130 @@ pub fn render_list(view: &ProjectView, session: &str, as_json: bool) -> String {
     if plan.is_empty()
         && view.notes.is_empty()
         && view.roadmap.is_empty()
+        && view.commands.is_empty()
         && view.last_summary.is_none()
     {
         out.push_str("nothing open\n");
     }
     out
+}
+
+// ── runbook ─────────────────────────────────────────────────────────────────
+
+const CMD_NAME_MAX: usize = 40;
+
+/// Save (or replace) a project command. Refuses anything that looks like a
+/// secret value unless `force`: the log is plain text.
+pub fn cmd_add(ctx: &Ctx, name: &str, command: &str, force: bool) -> Result<String> {
+    let name = name.split_whitespace().collect::<Vec<_>>().join(" ");
+    let command = command.trim();
+    if name.is_empty() || command.is_empty() {
+        bail!("usage: ddeck cmd add \"<name>\" '<command>'");
+    }
+    if name.chars().count() > CMD_NAME_MAX {
+        bail!("a command name is at most {CMD_NAME_MAX} characters");
+    }
+    if let Some(why) = deepdeck_core::runbook::secret_in(command).filter(|_| !force) {
+        bail!(
+            "not saved: the command seems to contain {why}. Keep secrets in a vault and refer to them \
+             (dv run --item <entry> --sh '…\"$NAME\"…', or $NAME from the environment). \
+             If it is not a secret, add --force"
+        );
+    }
+    let replaced = ctx.view()?.commands.iter().any(|c| c.name == name);
+    ctx.write(EventBody::CmdSet {
+        name: name.clone(),
+        command: command.to_owned(),
+    })?;
+    Ok(format!(
+        "command {} · {name} · {}",
+        if replaced { "replaced" } else { "saved" },
+        ctx.meta.name
+    ))
+}
+
+pub fn cmd_list(ctx: &Ctx) -> Result<String> {
+    let view = ctx.view()?;
+    if view.commands.is_empty() {
+        return Ok(format!(
+            "no saved commands in {} — add one: ddeck cmd add \"<name>\" '<command>'\n",
+            ctx.meta.name
+        ));
+    }
+    Ok(view
+        .commands
+        .iter()
+        .map(|c| format!("$ {}  {}\n", c.name, c.command))
+        .collect())
+}
+
+pub fn cmd_rm(ctx: &Ctx, name: &str) -> Result<String> {
+    let name = cmd_get(ctx, name)?.name;
+    ctx.write(EventBody::CmdDelete { name: name.clone() })?;
+    Ok(format!("command removed · {name} · {}", ctx.meta.name))
+}
+
+/// A saved command by exact name, else by a unique case-insensitive prefix.
+pub fn cmd_get(ctx: &Ctx, name: &str) -> Result<deepdeck_core::SavedCommand> {
+    let view = ctx.view()?;
+    if let Some(c) = view.commands.iter().find(|c| c.name == name) {
+        return Ok(c.clone());
+    }
+    let low = name.to_lowercase();
+    let hits: Vec<_> = view
+        .commands
+        .iter()
+        .filter(|c| c.name.to_lowercase().starts_with(&low))
+        .collect();
+    match hits.as_slice() {
+        [one] => Ok((*one).clone()),
+        [] if view.commands.is_empty() => {
+            bail!(
+                "no saved commands in {} — add one: ddeck cmd add \"<name>\" '<command>'",
+                ctx.meta.name
+            )
+        }
+        [] => bail!(
+            "no command \"{name}\" in {}; saved: {}",
+            ctx.meta.name,
+            view.commands
+                .iter()
+                .map(|c| c.name.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
+        many => bail!(
+            "\"{name}\" matches several: {}",
+            many.iter()
+                .map(|c| c.name.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
+    }
+}
+
+/// Run a saved command in the project root through the shell, output straight
+/// to the terminal. Returns its exit code.
+pub fn cmd_run(ctx: &Ctx, name: &str) -> Result<i32> {
+    let c = cmd_get(ctx, name)?;
+    eprintln!("$ {}", c.command);
+    #[cfg(unix)]
+    let mut sh = {
+        let mut sh = std::process::Command::new("sh");
+        sh.arg("-c").arg(&c.command);
+        sh
+    };
+    #[cfg(not(unix))]
+    let mut sh = {
+        let mut sh = std::process::Command::new("cmd");
+        sh.arg("/C").arg(&c.command);
+        sh
+    };
+    let status = sh
+        .current_dir(&ctx.meta.root)
+        .status()
+        .with_context(|| format!("running {}", c.name))?;
+    Ok(status.code().unwrap_or(1))
 }
 
 /// Find a registered project by id, name (case-insensitive) or path.
@@ -633,6 +761,67 @@ mod tests {
         );
         // Another session's prompts are out of reach.
         assert!(retract(&ctx(&d, "s2"), None, None).is_err());
+        std::fs::remove_dir_all(&d).unwrap();
+    }
+
+    #[test]
+    fn runbook_add_replace_run_remove() {
+        let d = tmp("cmd");
+        let c = ctx(&d, "s1");
+        assert_eq!(
+            cmd_add(&c, "release", "echo one > out.txt", false).unwrap(),
+            "command saved · release · repo"
+        );
+        assert_eq!(
+            cmd_add(&c, " release ", "echo two > out.txt", false).unwrap(),
+            "command replaced · release · repo"
+        );
+        cmd_add(
+            &c,
+            "secrets",
+            "dv run --item X --sh 'gh secret set T --body \"$T\"'",
+            false,
+        )
+        .unwrap();
+        // A pasted token is refused, and nothing is written.
+        let err = cmd_add(
+            &c,
+            "leak",
+            concat!("cargo login ci", "oAbCdEf0123456789xyzXYZ0123456789ab"),
+            false,
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(err.contains("not saved"), "{err}");
+        assert_eq!(c.view().unwrap().commands.len(), 2);
+
+        assert_eq!(cmd_get(&c, "rel").unwrap().command, "echo two > out.txt");
+        assert!(
+            cmd_get(&c, "nope")
+                .unwrap_err()
+                .to_string()
+                .contains("release, secrets")
+        );
+        assert!(
+            list(&c, false)
+                .unwrap()
+                .contains("  $ release  echo two > out.txt")
+        );
+        assert!(cmd_list(&c).unwrap().starts_with("$ release  echo two"));
+
+        // Runs in the project root.
+        #[cfg(unix)]
+        {
+            assert_eq!(cmd_run(&c, "release").unwrap(), 0);
+            let out = std::fs::read_to_string(c.meta.root.join("out.txt")).unwrap();
+            assert_eq!(out.trim(), "two");
+        }
+
+        assert_eq!(
+            cmd_rm(&c, "secrets").unwrap(),
+            "command removed · secrets · repo"
+        );
+        assert_eq!(c.view().unwrap().commands.len(), 1);
         std::fs::remove_dir_all(&d).unwrap();
     }
 

@@ -5,7 +5,8 @@
 //! - a session (its prompts, plan, waits, stops) once its last event is old —
 //!   except the session holding the project's latest summary;
 //! - a note once it is deleted, or done long ago, and all its events are old;
-//! - roadmap events superseded by a later `roadmap.set`.
+//! - roadmap events superseded by a later `roadmap.set`;
+//! - saved commands replaced by a later `cmd.set` or removed by `cmd.delete`.
 //!
 //! Everything else stays, however old: open notes, the current roadmap.
 
@@ -28,6 +29,8 @@ pub fn keep_mask(events: &[Event], cutoff: Timestamp) -> Vec<bool> {
     let mut note_last: HashMap<&str, Timestamp> = HashMap::new();
     let mut note_gone: HashMap<&str, bool> = HashMap::new();
     let mut last_roadmap_set = None;
+    // Saved commands: index of the event that defines each name's current state.
+    let mut cmd_last: HashMap<&str, usize> = HashMap::new();
     let mut latest_summary_session = None;
 
     for (i, e) in events.iter().enumerate() {
@@ -44,6 +47,9 @@ pub fn keep_mask(events: &[Event], cutoff: Timestamp) -> Vec<bool> {
             None => match &e.body {
                 EventBody::RoadmapSet { .. } => last_roadmap_set = Some(i),
                 EventBody::RoadmapStep { .. } => {}
+                EventBody::CmdSet { name, .. } | EventBody::CmdDelete { name } => {
+                    cmd_last.insert(name, i);
+                }
                 body => {
                     if let Some(s) = e.session.as_deref() {
                         let t = session_last.entry(s).or_insert(e.ts);
@@ -76,6 +82,9 @@ pub fn keep_mask(events: &[Event], cutoff: Timestamp) -> Vec<bool> {
                 EventBody::RoadmapSet { .. } | EventBody::RoadmapStep { .. } => {
                     last_roadmap_set.is_some_and(|last| i >= last)
                 }
+                // The current definition stays however old; a deletion has nothing left to hide.
+                EventBody::CmdSet { name, .. } => cmd_last.get(name.as_str()) == Some(&i),
+                EventBody::CmdDelete { .. } => false,
                 _ => e
                     .session
                     .as_deref()
@@ -142,6 +151,17 @@ mod tests {
         )
     }
 
+    fn cmd(day: i64, name: &str, command: &str) -> Event {
+        e(
+            day,
+            Some("old"),
+            EventBody::CmdSet {
+                name: name.into(),
+                command: command.into(),
+            },
+        )
+    }
+
     fn sample() -> Vec<Event> {
         vec![
             prompt(0, "old", "long gone"),
@@ -192,6 +212,16 @@ mod tests {
                 },
             ),
             prompt(26, "new", "fresh"),
+            cmd(2, "release", "make release"),
+            cmd(3, "secrets", "dv run --item X --sh 'gh secret set'"),
+            cmd(4, "release", "make release V=1"),
+            e(
+                5,
+                Some("old"),
+                EventBody::CmdDelete {
+                    name: "secrets".into(),
+                },
+            ),
         ]
     }
 
@@ -201,8 +231,9 @@ mod tests {
         let keep = keep_mask(&events, at(20));
         let archived: Vec<usize> = (0..events.len()).filter(|&i| !keep[i]).collect();
         // old session (0, 1), deleted note (3, 4), long-done note (5, 6),
-        // superseded roadmap (8).
-        assert_eq!(archived, [0, 1, 3, 4, 5, 6, 8]);
+        // superseded roadmap (8), replaced and deleted commands (17, 18, 20);
+        // the current "release" (19) stays although its session is gone.
+        assert_eq!(archived, [0, 1, 3, 4, 5, 6, 8, 17, 18, 20]);
     }
 
     #[test]
@@ -220,6 +251,9 @@ mod tests {
         let live = fold_project(meta, &kept);
         assert_eq!(live.notes, full.notes);
         assert_eq!(live.roadmap, full.roadmap);
+        assert_eq!(live.commands, full.commands);
+        assert_eq!(live.commands.len(), 1);
+        assert_eq!(live.commands[0].command, "make release V=1");
         assert_eq!(live.last_summary, full.last_summary);
         assert_eq!(live.last_activity, full.last_activity);
         // Only the ended, long-gone session disappears.

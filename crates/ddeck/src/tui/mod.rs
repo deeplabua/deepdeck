@@ -7,6 +7,7 @@ mod app;
 mod inbox;
 mod input;
 mod projects;
+mod select;
 mod source;
 mod strings;
 mod text;
@@ -53,6 +54,7 @@ pub fn run(paths: Paths, settings_path: &Path) -> Result<()> {
         source.board(Timestamp::now(), ACTIVE_HOURS),
         hooks_installed,
     );
+    app.set_order(load_order(&source.paths().tui_prefs()));
 
     let mut watch = BinaryWatch::new();
     let mut terminal = ratatui::init();
@@ -73,7 +75,7 @@ pub fn run(paths: Paths, settings_path: &Path) -> Result<()> {
         let mut message: Option<String> = None;
         loop {
             let now = Timestamp::now();
-            terminal.draw(|f| {
+            let frame = terminal.draw(|f| {
                 draw(
                     f,
                     &mut app,
@@ -82,8 +84,13 @@ pub fn run(paths: Paths, settings_path: &Path) -> Result<()> {
                     message.as_deref(),
                     &EN,
                     &Theme::from_env(),
-                )
+                );
+                if let Some(sel) = app.drag.filter(|s| !s.is_empty()) {
+                    sel.highlight(f.buffer_mut());
+                }
             })?;
+            // What is on screen, for copying a mouse selection.
+            let screen = frame.buffer.clone();
             let effect = if event::poll(TICK)? {
                 match event::read()? {
                     TermEvent::Key(key) if key.kind == KeyEventKind::Press => {
@@ -109,11 +116,42 @@ pub fn run(paths: Paths, settings_path: &Path) -> Result<()> {
                             }
                         }
                     }
+                    Some(Effect::SaveOrder(order)) => {
+                        let saved = save_order(&source.paths().tui_prefs(), order);
+                        message = Some(match saved {
+                            Ok(()) => (EN.sorted)(order),
+                            Err(e) => format!("{e}"),
+                        });
+                    }
+                    Some(Effect::CopySelection(sel)) => {
+                        let text = sel.text(&screen);
+                        message = Some(match crate::clipboard::copy(&text) {
+                            Ok(how) => (EN.copied)(how),
+                            Err(e) => e,
+                        });
+                    }
+                    Some(Effect::Copy(text)) => {
+                        message = Some(match crate::clipboard::copy(&text) {
+                            Ok(how) => (EN.copied)(how),
+                            Err(e) => e,
+                        });
+                    }
+                    Some(Effect::Focus { pane, root }) => {
+                        message = Some(if !crate::herdr::available() {
+                            EN.herdr_outside.to_owned()
+                        } else {
+                            match crate::herdr::focus(pane.as_deref(), &root) {
+                                Ok(()) => String::new(),
+                                Err(e) => e,
+                            }
+                        })
+                        .filter(|m| !m.is_empty());
+                    }
                     None => {}
                 }
             }
             if source.poll()? {
-                app.board = source.board(Timestamp::now(), ACTIVE_HOURS);
+                app.set_board(source.board(Timestamp::now(), ACTIVE_HOURS));
             }
             // A new ddeck was installed: restart into it, unless the user is typing.
             if app.input.is_none() && watch.updated() {
@@ -186,6 +224,24 @@ impl BinaryWatch {
         self.pending = Some(now);
         false
     }
+}
+
+/// Board preferences (`tui.json`): missing or unreadable means the defaults.
+fn load_order(path: &Path) -> deepdeck_core::Order {
+    std::fs::read(path)
+        .ok()
+        .and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok())
+        .and_then(|v| serde_json::from_value(v["order"].clone()).ok())
+        .unwrap_or_default()
+}
+
+fn save_order(path: &Path, order: deepdeck_core::Order) -> std::io::Result<()> {
+    let json = serde_json::to_vec(&serde_json::json!({ "order": order }))
+        .map_err(std::io::Error::other)?;
+    if let Some(dir) = path.parent() {
+        store::ensure_private_dir(dir)?;
+    }
+    std::fs::write(path, json)
 }
 
 /// Replace this process with the freshly installed binary, same arguments.
@@ -473,7 +529,9 @@ fn draw_footer(
         Screen::Timeline => t.keys_timeline,
         Screen::Inbox => t.keys_inbox,
     };
-    for (k, label) in keys {
+    // `o` jumps to an agent's herdr pane: only worth a hint inside herdr.
+    let herdr = crate::herdr::available();
+    for (k, label) in keys.iter().filter(|(k, _)| herdr || *k != "o") {
         let w = text::width(k) + 1 + text::width(label) + 2;
         if used + w > width {
             break;
@@ -488,6 +546,18 @@ fn draw_footer(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn order_preference_round_trips() {
+        let dir = std::env::temp_dir().join(format!("ddeck-prefs-{}", std::process::id()));
+        let path = dir.join("tui.json");
+        assert_eq!(load_order(&path), deepdeck_core::Order::Name);
+        save_order(&path, deepdeck_core::Order::Attention).unwrap();
+        assert_eq!(load_order(&path), deepdeck_core::Order::Attention);
+        std::fs::write(&path, "garbage").unwrap();
+        assert_eq!(load_order(&path), deepdeck_core::Order::Name);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
 
     #[test]
     fn binary_watch_needs_a_stable_new_stamp() {

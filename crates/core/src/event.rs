@@ -151,6 +151,14 @@ pub enum EventBody {
 
     #[serde(rename = "note.delete")]
     NoteDelete { id: String },
+
+    /// A saved project command (runbook entry): set or replace by `name`.
+    /// References to secrets only (`dv run --item …`), never their values.
+    #[serde(rename = "cmd.set")]
+    CmdSet { name: String, command: String },
+
+    #[serde(rename = "cmd.delete")]
+    CmdDelete { name: String },
 }
 
 impl EventBody {
@@ -172,6 +180,8 @@ impl EventBody {
             EventBody::NoteDone { .. } => "note.done",
             EventBody::NoteDelete { .. } => "note.delete",
             EventBody::NoteReopen { .. } => "note.reopen",
+            EventBody::CmdSet { .. } => "cmd.set",
+            EventBody::CmdDelete { .. } => "cmd.delete",
         }
     }
 }

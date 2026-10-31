@@ -4,6 +4,28 @@ All notable changes to DeepDeck are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.3.0 — 2026-10-31
+
+### Added
+
+- **`o` jumps to the agent in herdr.** On Projects and in the Inbox, `o` switches herdr to the pane of the
+  agent behind the selected line — the one waiting for you, or the session a plan step belongs to. The pane
+  comes from the hook (`HERDR_PANE_ID`); for agents started before the hooks, the agent working in the
+  project directory is found with `herdr agent list`. Shown only when `ddeck` itself runs inside herdr.
+- **Saved commands (runbook).** `ddeck cmd add "<name>" '<command>'` keeps a project command worth repeating —
+  a release, a deploy, setting CI secrets; `ddeck cmd` lists them, `cmd run` runs one in the project root,
+  `cmd show` prints it, `cmd rm` removes it. They appear under `commands` on the Projects screen, in the
+  Timeline and in `ddeck list` (also `--json`), and survive log archiving. Anything that looks like a secret
+  value (tokens, keys, `PASSWORD=…`) is refused: refer to a vault or an environment variable instead.
+- **`y` copies the selected line** in full — a saved command, a note, a prompt, a plan step — with `pbcopy`,
+  `wl-copy`, `xclip`, `xsel` or `clip`, else through the terminal (OSC 52). Mouse capture had made the
+  terminal's own selection impossible.
+- **Drag to select text** on any screen: the selection is highlighted and copied when the button is released;
+  a click without a drag still selects and opens lines.
+- **Projects stay in place:** listed by name by default; `s` switches to the attention order (waiting →
+  working → idle) and back, remembered in `~/.deepdeck/tui.json`.
+- The `CLAUDE.md` block (v5) teaches agents to save such commands and to check `ddeck cmd` before asking.
+
 ## 0.2.0 — 2026-10-31
 
 The first public release.
