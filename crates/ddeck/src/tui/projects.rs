@@ -17,6 +17,8 @@ use super::theme::Theme;
 pub const MAX_DONE_SHOWN: usize = 5;
 /// Done notes shown under the open ones; the rest fold into "+ N done".
 pub const MAX_DONE_NOTES: usize = 3;
+/// Saved commands shown before the rest fold into "+ N more" (two lines each).
+pub const MAX_COMMANDS: usize = 3;
 
 /// Something the cursor can stand on. Every line that can be cut with `…`
 /// is an item, so `↵` can open it in full.
@@ -520,18 +522,48 @@ fn project_block(
             Some(Span::styled(p.commands.len().to_string(), th.dim())),
             width,
         ));
-        for c in &p.commands {
+        let fold = p.commands.len() > MAX_COMMANDS
+            && !view.open.contains(&Item::Project(p.meta.id.clone()));
+        let shown = if fold { MAX_COMMANDS } else { p.commands.len() };
+        // Two lines each, like a script: `# name`, then `$ command` with the full width.
+        for c in &p.commands[..shown] {
+            let item = Item::Command(p.meta.id.clone(), c.name.clone());
+            let start = r.lines.len();
+            r.lines.push(row(
+                vec![
+                    gutter(view.selected == Some(&item), th),
+                    Span::raw("    "),
+                    Span::styled("# ", th.dim()),
+                ],
+                &c.name,
+                th.dim(),
+                None,
+                width,
+            ));
             item_lines(
                 r,
-                Item::Command(p.meta.id.clone(), c.name.clone()),
+                item,
                 view,
                 th,
                 vec![Span::raw("    "), Span::styled("$ ", th.accent())],
-                &format!("{} · {}", c.name, c.command),
+                &c.command,
                 Style::new(),
                 None,
                 width,
             );
+            // The item starts at its name line (cursor scroll, mouse clicks).
+            if let Some(last) = r.items.last_mut() {
+                last.1 = start;
+            }
+        }
+        if fold {
+            r.lines.push(row(
+                vec![Span::raw("     ")],
+                &(t.more)(p.commands.len() - shown),
+                th.dim(),
+                None,
+                width,
+            ));
         }
     }
 }
@@ -787,10 +819,21 @@ mod tests {
                 "   ideas                             0/1",
                 "     ◆ zstd",
                 "   commands                            2",
-                "     $ release · scripts/sync-public.sh…",
-                "     $ test · cargo test",
+                "     # release",
+                "     $ scripts/sync-public.sh main \"Rel…",
+                "     # test",
+                "     $ cargo test",
             ]
         );
+        // The item starts at its name line.
+        let start = |name: &str| {
+            r.items
+                .iter()
+                .find(|(i, _)| *i == Item::Command(b.projects[0].meta.id.clone(), name.into()))
+                .map(|(_, s)| *s)
+        };
+        assert_eq!(start("release"), Some(4));
+        assert_eq!(start("test"), Some(6));
         let id = b.projects[0].meta.id.clone();
         assert!(
             r.items

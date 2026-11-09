@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result, bail};
 
 /// Bump when the block text changes, so `setup` and `doctor` see stale copies.
-pub const BLOCK_VERSION: u32 = 5;
+pub const BLOCK_VERSION: u32 = 6;
 const BEGIN_PREFIX: &str = "<!-- ddeck:begin";
 const END: &str = "<!-- ddeck:end -->";
 
@@ -22,12 +22,12 @@ The user follows your work on a task board. Keep it current:
 
 - When you start multi-step work, post the plan: `ddeck plan \"step 1\" \"step 2\" …` (replaces the previous plan).
 - Mark progress as you go: `ddeck step <n> doing`, then `ddeck step <n> done`.
-- When you lay out what comes after this request (next sessions, follow-ups, steps for the user), post it as the project roadmap: `ddeck roadmap set \"…\" \"…\"` (replaces it; `ddeck roadmap` shows the current one). Mark progress with `ddeck roadmap step <n> done`.
+- When your reply says what comes next (next sessions, follow-ups, \"what you do next\" steps for the user), post it as the project roadmap in the same turn: `ddeck roadmap set \"…\" \"…\"`. It replaces the whole roadmap, so read `ddeck roadmap` first and keep the steps still open. Mark finished steps with `ddeck roadmap step <n> done`.
 - A question only the user can answer: `ddeck ask \"…\"`, then continue with a safe default if you can.
 - An idea or fix deferred for later: `ddeck idea \"…\"`.
 - If the user confirms their message was meant for another session, run `ddeck retract \"<a few words from it>\"` (when they name where it belonged, add `--to <that project>`).
-- A command the user will need again (a release, a deploy, setting CI secrets): save it with `ddeck cmd add \"<name>\" '<command>'`; `ddeck cmd` lists the saved ones — check there before asking how. Refer to secrets (`dv run --item …`, `$NAME`), never paste their values.
-- When you finish a piece of work (a commit, the end of a task), save a 2–4 sentence summary — what was done, what was decided, what is left: `ddeck summary \"…\"`.
+- A command worth repeating — a release, a deploy, an upload, publishing, setting CI secrets — once it has worked, even if you ran it yourself: save it with `ddeck cmd add \"<name>\" '<command>'` unless `ddeck cmd` already has it. Save the reusable form (`VERSION=X.Y.Z`, not this release's number). Check `ddeck cmd` before asking how. Refer to secrets (`dv run --item …`, `$NAME`), never paste their values.
+- When you finish a piece of work (a commit, a release, the end of a task), save a 2–4 sentence summary — what was done, what was decided, what is left: `ddeck summary \"…\"`. In the same step: is the roadmap still true, and did you run a command worth saving?
 - Before starting work in a project, read `ddeck list`: open items, the roadmap and what the last session left.
 
 Each command prints one line; do not repeat it in your reply.

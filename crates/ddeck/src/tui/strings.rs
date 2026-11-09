@@ -28,6 +28,8 @@ pub struct Strings {
     pub quiet: &'static str,
     /// "+ 7 done" — collapsed completed tasks.
     pub more_done: fn(usize) -> String,
+    /// "+ 2 more" — folded saved commands.
+    pub more: fn(usize) -> String,
     /// "+1 session" — other sessions in the same project.
     pub more_sessions: fn(usize) -> String,
     /// Time since an event, compact: "now", "5m", "2h", "3d".
@@ -68,7 +70,8 @@ pub struct Strings {
     /// In place of a retracted prompt and its answer.
     pub tl_retracted: &'static str,
     pub tl_moved_to: fn(&str) -> String,
-    pub tl_filter: &'static str,
+    /// Footer label while `f` shows one project: "only DeepDeck".
+    pub only: &'static str,
 
     pub ib_waiting: &'static str,
     pub ib_questions: &'static str,
@@ -101,6 +104,7 @@ pub const EN: Strings = Strings {
     last_session: "last session:",
     quiet: "idle",
     more_done: |n| format!("+ {n} done"),
+    more: |n| format!("+ {n} more"),
     more_sessions: |n| {
         if n == 1 {
             "+1 session".to_owned()
@@ -131,6 +135,7 @@ pub const EN: Strings = Strings {
         ("o", "agent"),
         ("y", "copy"),
         ("s", "sort"),
+        ("f", "only"),
         ("a", "task"),
         ("?", "question"),
         ("i", "idea"),
@@ -149,6 +154,7 @@ pub const EN: Strings = Strings {
     keys_inbox: &[
         ("o", "agent"),
         ("y", "copy"),
+        ("f", "only"),
         ("↵", "open"),
         ("␣", "resolved"),
         ("m", "→ task"),
@@ -179,7 +185,7 @@ pub const EN: Strings = Strings {
     tl_empty: "Nothing today yet.",
     tl_retracted: "misdirected message removed",
     tl_moved_to: |project| format!("message moved to {project}"),
-    tl_filter: "only",
+    only: "only",
 
     ib_waiting: "WAITING FOR YOU",
     ib_questions: "OPEN QUESTIONS",

@@ -4,6 +4,25 @@ All notable changes to DeepDeck are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.4.0 — 2026-11-09
+
+### Added
+
+- **`f` shows one project on every screen.** Projects and Inbox narrow to the selected project the same way
+  the Timeline already did; `f` again shows all. The header counts stay global, so a waiting agent elsewhere
+  is still visible.
+
+### Changed
+
+- **Saved commands read like a script.** Each one takes two lines on the board — `# name`, then
+  `$ command` with the full width — and after three the rest fold into `+ N more` (`↵` on the project shows
+  all). An opened item now scrolls into view whole, not just its first line.
+- **`ddeck cmd` lists commands the same way** — `# name`, then `$ command` — colored in a terminal
+  (`NO_COLOR` turns it off).
+- **Agent instructions (block v6):** save a command once it has worked, even one the agent ran itself;
+  update the roadmap in the same turn as a "what's next" reply, keeping the steps still open; check both when
+  saving a summary. `ddeck setup` updates the block.
+
 ## 0.3.2 — 2026-10-31
 
 The first published release of the 0.3 line. The 0.3.0 tag built no binaries (a masked release note

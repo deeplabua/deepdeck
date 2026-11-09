@@ -56,9 +56,10 @@ pub struct App {
     pub input: Option<InputLine>,
     pub scroll: usize,
     pub hooks_installed: bool,
-    /// Timeline: lines scrolled from the top, and the project filter (`f`).
+    /// Timeline: lines scrolled from the top.
     pub timeline_scroll: usize,
-    pub timeline_filter: Option<ProjectId>,
+    /// One project instead of all, on every screen (`f`).
+    pub only: Option<ProjectId>,
     /// Mouse selection in progress or just copied (shown reversed).
     pub drag: Option<Selection>,
     /// How projects are listed; `s` toggles.
@@ -81,7 +82,7 @@ impl App {
             scroll: 0,
             hooks_installed,
             timeline_scroll: 0,
-            timeline_filter: None,
+            only: None,
             drag: None,
             order: Order::default(),
         }
@@ -111,6 +112,31 @@ impl App {
             self.selected = items.first().cloned();
         }
         self.items = items;
+    }
+
+    /// The board as shown: one project when `f` narrowed it and that project
+    /// is still on the board, else all of them.
+    pub fn shown(&self) -> std::borrow::Cow<'_, Board> {
+        match self
+            .only
+            .as_ref()
+            .and_then(|id| self.board.projects.iter().find(|p| &p.meta.id == id))
+        {
+            Some(p) => std::borrow::Cow::Owned(Board {
+                projects: vec![p.clone()],
+            }),
+            None => std::borrow::Cow::Borrowed(&self.board),
+        }
+    }
+
+    /// `f`: only the selected project, or all again.
+    fn toggle_only(&mut self) {
+        self.only = match self.only {
+            Some(_) => None,
+            None => self.selected_project(),
+        };
+        self.timeline_scroll = 0;
+        self.scroll = 0;
     }
 
     fn selected_project(&self) -> Option<ProjectId> {
@@ -203,6 +229,7 @@ impl App {
                     Screen::Inbox => Screen::Timeline,
                 }
             }
+            KeyCode::Char('f') => self.toggle_only(),
             _ if self.screen == Screen::Timeline => self.timeline_key(key),
             KeyCode::Char('j') | KeyCode::Down => self.move_cursor(1),
             KeyCode::Char('k') | KeyCode::Up => self.move_cursor(-1),
@@ -400,13 +427,6 @@ impl App {
             }
             KeyCode::Char('g') | KeyCode::Home => self.timeline_scroll = 0,
             KeyCode::Char('G') | KeyCode::End => self.timeline_scroll = usize::MAX,
-            KeyCode::Char('f') => {
-                self.timeline_filter = match self.timeline_filter {
-                    Some(_) => None,
-                    None => self.selected_project(),
-                };
-                self.timeline_scroll = 0;
-            }
             _ => {}
         }
     }
@@ -762,12 +782,38 @@ mod tests {
         app.handle_key(key('k'), now());
         assert_eq!(app.timeline_scroll, 1);
         app.handle_key(key('f'), now());
-        assert_eq!(app.timeline_filter, Some(id));
+        assert_eq!(app.only, Some(id));
         assert_eq!(app.timeline_scroll, 0);
         app.handle_key(key('f'), now());
-        assert_eq!(app.timeline_filter, None);
+        assert_eq!(app.only, None);
         // Notes keys do nothing on the timeline.
         assert_eq!(app.handle_key(key('d'), now()), None);
+    }
+
+    #[test]
+    fn f_narrows_every_screen_to_one_project() {
+        let a = ProjectMeta::for_root(Path::new("/p/DeepDeck"));
+        let b = ProjectMeta::for_root(Path::new("/p/DeepVault"));
+        let mut app = App::new(fold([(a.clone(), vec![]), (b.clone(), vec![])]), true);
+        app.set_items(vec![
+            Item::Project(a.id.clone()),
+            Item::Project(b.id.clone()),
+        ]);
+        app.handle_key(key('j'), now());
+        assert_eq!(app.shown().projects.len(), 2);
+        app.handle_key(key('f'), now());
+        assert_eq!(app.only, Some(b.id.clone()));
+        let shown = app.shown();
+        assert_eq!(shown.projects.len(), 1);
+        assert_eq!(shown.projects[0].meta.id, b.id);
+        drop(shown);
+        // Same filter on the inbox; the project leaving the board shows all again.
+        app.handle_key(key('3'), now());
+        assert_eq!(app.shown().projects.len(), 1);
+        app.set_board(fold([(a, vec![])]));
+        assert_eq!(app.shown().projects.len(), 1);
+        app.handle_key(key('f'), now());
+        assert_eq!(app.only, None);
     }
 
     #[test]

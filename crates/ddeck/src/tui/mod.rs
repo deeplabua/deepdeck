@@ -286,7 +286,7 @@ fn draw(
                 now,
                 &jiff::tz::TimeZone::system(),
                 body.width,
-                app.timeline_filter.as_ref(),
+                app.only.as_ref(),
                 t,
                 th,
             );
@@ -301,7 +301,7 @@ fn draw(
                     selected: app.selected.as_ref(),
                     open: &app.open,
                 };
-                inbox::layout_inbox(&app.board, now, body.width, &view, t, th)
+                inbox::layout_inbox(&app.shown(), now, body.width, &view, t, th)
             };
             show_selectable(f, body, app, r);
         }
@@ -418,7 +418,7 @@ fn draw_projects(
             selected: app.selected.as_ref(),
             open: &app.open,
         };
-        layout_projects(&app.board, now, area.width, &view, t, th)
+        layout_projects(&app.shown(), now, area.width, &view, t, th)
     };
     show_selectable(f, area, app, r);
 }
@@ -431,18 +431,21 @@ fn show_selectable(f: &mut Frame<'_>, area: Rect, app: &mut App, r: projects::Re
     app.body_top = area.y;
     app.set_items(rows.iter().map(|(i, _)| i.clone()).collect());
 
-    // Keep the selected row (and the line after it) on screen.
+    // Keep the selected item on screen: all its lines (an opened one wraps)
+    // and the line after it, as far as the height allows; its first line always.
     let height = usize::from(area.height);
-    if let Some(row) = app
+    if let Some(pos) = app
         .selected
         .as_ref()
-        .and_then(|s| rows.iter().find(|(i, _)| i == s))
-        .map(|(_, row)| *row)
+        .and_then(|s| rows.iter().position(|(i, _)| i == s))
     {
+        let row = rows[pos].1;
+        let next = rows.get(pos + 1).map_or(r.lines.len(), |(_, start)| *start);
+        let end = (next + 1).max(row + 2).min(row + height);
         if row < app.scroll {
             app.scroll = row.saturating_sub(1);
-        } else if row + 2 > app.scroll + height {
-            app.scroll = (row + 2).saturating_sub(height);
+        } else if end > app.scroll + height {
+            app.scroll = end.saturating_sub(height);
         }
     }
     app.scroll = app.scroll.min(r.lines.len().saturating_sub(height));
@@ -513,14 +516,13 @@ fn draw_footer(
     }
     let mut spans = vec![Span::raw(" ")];
     let mut used = 1;
-    if app.screen == Screen::Timeline
-        && let Some(name) = app
-            .timeline_filter
-            .as_ref()
-            .and_then(|id| app.board.projects.iter().find(|p| &p.meta.id == id))
-            .map(|p| p.meta.name.clone())
+    if let Some(name) = app
+        .only
+        .as_ref()
+        .and_then(|id| app.board.projects.iter().find(|p| &p.meta.id == id))
+        .map(|p| p.meta.name.clone())
     {
-        let label = format!("{} {name}  ", t.tl_filter);
+        let label = format!("{} {name}  ", t.only);
         used += text::width(&label);
         spans.push(Span::styled(label, th.accent()));
     }

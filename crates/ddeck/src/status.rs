@@ -12,7 +12,15 @@ pub struct Style {
 }
 
 impl Style {
-    fn paint(&self, code: &str, s: &str) -> String {
+    /// Colors when stdout is a terminal and `NO_COLOR` is unset.
+    pub fn for_stdout() -> Self {
+        use std::io::IsTerminal as _;
+        Style {
+            color: std::io::stdout().is_terminal() && std::env::var_os("NO_COLOR").is_none(),
+        }
+    }
+
+    pub fn paint(&self, code: &str, s: &str) -> String {
         if self.color {
             format!("\x1b[{code}m{s}\x1b[0m")
         } else {

@@ -10,7 +10,6 @@ mod setup;
 mod status;
 mod tui;
 
-use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
@@ -319,7 +318,7 @@ fn run(command: Command) -> Result<ExitCode> {
                     Ok(ExitCode::from(u8::try_from(code).unwrap_or(1)))
                 }
                 None => {
-                    print!("{}", cli::cmd_list(&ctx)?);
+                    print!("{}", cli::cmd_list(&ctx, &status::Style::for_stdout())?);
                     Ok(ExitCode::SUCCESS)
                 }
             }
@@ -372,9 +371,10 @@ fn run(command: Command) -> Result<ExitCode> {
             if short {
                 println!("{}", status::render_short(&board));
             } else {
-                let color =
-                    std::io::stdout().is_terminal() && std::env::var_os("NO_COLOR").is_none();
-                print!("{}", status::render(&board, now, &status::Style { color }));
+                print!(
+                    "{}",
+                    status::render(&board, now, &status::Style::for_stdout())
+                );
             }
             Ok(ExitCode::SUCCESS)
         }

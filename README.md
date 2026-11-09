@@ -106,7 +106,7 @@ Run `ddeck` in a side panel (60 columns is plenty). Three screens:
 | `s` | Projects by name (default, they stay put) / by attention (waiting first); remembered |
 | `a` `?` `i` | Add a task, question or idea |
 | `e` / `d` | Edit / delete |
-| `f` | Timeline: this project / all |
+| `f` | One project / all — on every screen (the selected project) |
 | `q` | Quit |
 
 The mouse works too: click to select, click again to expand, scroll the wheel, click a tab. Drag to select

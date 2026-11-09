@@ -464,7 +464,8 @@ pub fn cmd_add(ctx: &Ctx, name: &str, command: &str, force: bool) -> Result<Stri
     ))
 }
 
-pub fn cmd_list(ctx: &Ctx) -> Result<String> {
+/// Saved commands like a script: `# name`, then `$ command`, a blank line between.
+pub fn cmd_list(ctx: &Ctx, style: &crate::status::Style) -> Result<String> {
     let view = ctx.view()?;
     if view.commands.is_empty() {
         return Ok(format!(
@@ -475,8 +476,16 @@ pub fn cmd_list(ctx: &Ctx) -> Result<String> {
     Ok(view
         .commands
         .iter()
-        .map(|c| format!("$ {}  {}\n", c.name, c.command))
-        .collect())
+        .map(|c| {
+            format!(
+                "{}\n{} {}\n",
+                style.paint("2", &format!("# {}", c.name)),
+                style.paint("36", "$"),
+                c.command
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n"))
 }
 
 pub fn cmd_rm(ctx: &Ctx, name: &str) -> Result<String> {
@@ -807,7 +816,12 @@ mod tests {
                 .unwrap()
                 .contains("  $ release  echo two > out.txt")
         );
-        assert!(cmd_list(&c).unwrap().starts_with("$ release  echo two"));
+        let plain = crate::status::Style { color: false };
+        assert!(
+            cmd_list(&c, &plain)
+                .unwrap()
+                .starts_with("# release\n$ echo two > out.txt\n")
+        );
 
         // Runs in the project root.
         #[cfg(unix)]
