@@ -41,7 +41,7 @@ pub fn run(paths: &Paths, settings_path: &Path) -> Result<bool> {
             println!("  ✗ {e:#}");
         }
         Ok((_, settings)) => {
-            let want = exe.as_deref().map(install::hook_command);
+            let want = install::hook_exe().ok().map(|e| install::hook_command(&e));
             for (event, cmd) in install::installed(&settings) {
                 match cmd {
                     None => {

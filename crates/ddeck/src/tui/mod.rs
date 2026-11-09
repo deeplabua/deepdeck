@@ -298,6 +298,7 @@ fn draw(
         })
         .collect();
     f.render_widget(Paragraph::new(lines), notices);
+    app.notice_top = notices.y;
     draw_header(f, header, app, t, th);
     match app.screen {
         Screen::Projects => draw_projects(f, body, app, now, t, th),

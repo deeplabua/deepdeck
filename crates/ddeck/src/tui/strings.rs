@@ -132,13 +132,15 @@ pub const EN: Strings = Strings {
         deepdeck_core::Order::Attention => "projects by attention — s: by name".to_owned(),
     },
     notice: |n| match n {
-        crate::update::Notice::NewVersion(v, cmd) => format!("↑ DeepDeck {v} is out — {cmd}"),
+        crate::update::Notice::NewVersion(v, cmd) => {
+            format!("↑ DeepDeck {v} is out — {cmd}  (u: copy)")
+        }
         crate::update::Notice::Setup { installed: Some(v) } => format!(
-            "agent instructions are v{v}, this ddeck has v{} — run ddeck setup",
+            "agent instructions are v{v}, this ddeck has v{} — run ddeck setup  (u: copy)",
             crate::setup::BLOCK_VERSION
         ),
         crate::update::Notice::Setup { installed: None } => {
-            "agents have no DeepDeck instructions — run ddeck setup".to_owned()
+            "agents have no DeepDeck instructions — run ddeck setup  (u: copy)".to_owned()
         }
     },
     herdr_outside: "o jumps to the agent in herdr — run ddeck in a herdr pane",

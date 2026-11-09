@@ -9,29 +9,26 @@
 use std::path::{Path, PathBuf};
 
 /// How this binary was installed, which decides the upgrade command.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Install {
     Brew,
     /// `cargo install deepdeck` from crates.io.
     Cargo,
     /// cargo-dist's shell or PowerShell installer.
     Installer,
-    /// Built from a source checkout (`cargo install --path`): no notice.
-    Source,
+    /// Built from a source checkout (`cargo install --path <dir>`).
+    Source(String),
 }
 
 impl Install {
-    pub fn upgrade_command(self) -> Option<&'static str> {
+    pub fn upgrade_command(&self) -> String {
         match self {
-            Install::Brew => Some("brew upgrade deepdeck"),
-            Install::Cargo => Some("cargo install deepdeck --locked"),
-            Install::Installer if cfg!(windows) => Some(
-                "powershell -c \"irm https://github.com/deeplabua/deepdeck/releases/latest/download/deepdeck-installer.ps1 | iex\"",
-            ),
-            Install::Installer => Some(
-                "curl -LsSf https://github.com/deeplabua/deepdeck/releases/latest/download/deepdeck-installer.sh | sh",
-            ),
-            Install::Source => None,
+            Install::Brew => "brew upgrade deepdeck".to_owned(),
+            Install::Cargo => "cargo install deepdeck --locked".to_owned(),
+            Install::Installer if cfg!(windows) => "powershell -c \"irm https://github.com/deeplabua/deepdeck/releases/latest/download/deepdeck-installer.ps1 | iex\"".to_owned(),
+            Install::Installer => "curl -LsSf https://github.com/deeplabua/deepdeck/releases/latest/download/deepdeck-installer.sh | sh".to_owned(),
+            // Pull first: a released version newer than this build means the checkout is behind.
+            Install::Source(dir) => format!("cargo install --path {dir} --locked"),
         }
     }
 }
@@ -40,7 +37,7 @@ impl Install {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Notice {
     /// A newer release is known: (version, upgrade command).
-    NewVersion(String, &'static str),
+    NewVersion(String, String),
     /// The agent instructions are missing or older: `ddeck setup`.
     Setup { installed: Option<u32> },
 }
@@ -50,13 +47,12 @@ pub enum Notice {
 pub fn notices(hooks_installed: bool) -> Vec<Notice> {
     let mut out = Vec::new();
     let install = how_installed();
-    if let Some(cmd) = install.upgrade_command()
-        && let Some(v) = known_versions()
-            .into_iter()
-            .filter(|v| newer(v, env!("CARGO_PKG_VERSION")))
-            .max_by(|a, b| cmp_versions(a, b))
+    if let Some(v) = known_versions()
+        .into_iter()
+        .filter(|v| newer(v, env!("CARGO_PKG_VERSION")))
+        .max_by(|a, b| cmp_versions(a, b))
     {
-        out.push(Notice::NewVersion(v, cmd));
+        out.push(Notice::NewVersion(v, install.upgrade_command()));
     }
     // Without hooks the board already says to run `ddeck setup`.
     if hooks_installed {
@@ -95,11 +91,33 @@ pub fn classify(exe: &Path, crates2: Option<&str>, installer_receipt: bool) -> I
         t[at..].split('"').nth(1).map(str::to_owned)
     });
     match key {
-        Some(k) if k.contains("(path+") => Install::Source,
+        Some(k) if k.contains("(path+") => Install::Source(source_dir(&k)),
         Some(k) if k.contains("(registry+") || k.contains("(sparse+") => Install::Cargo,
         _ if installer_receipt => Install::Installer,
         // Unknown: the installer works everywhere.
         _ => Install::Installer,
+    }
+}
+
+/// The directory in "deepdeck 0.4.0 (path+file:///Users/me/DeepDeck/crates/ddeck)",
+/// with the home directory as `~` to keep the command short.
+fn source_dir(key: &str) -> String {
+    let dir = key
+        .split_once("(path+file://")
+        .map_or("", |(_, rest)| rest.trim_end_matches(')'));
+    match std::env::home_dir().and_then(|h| h.to_str().map(str::to_owned)) {
+        Some(h) if !h.is_empty() && dir.starts_with(&format!("{h}/")) => {
+            format!("~{}", &dir[h.len()..])
+        }
+        _ => dir.to_owned(),
+    }
+}
+
+/// The text to copy for a notice: the command it names.
+pub fn command(n: &Notice) -> String {
+    match n {
+        Notice::NewVersion(_, cmd) => cmd.clone(),
+        Notice::Setup { .. } => "ddeck setup".to_owned(),
     }
 }
 
@@ -242,8 +260,14 @@ mod tests {
         assert_eq!(classify(bin, Some(registry), false), Install::Cargo);
         let path =
             r#"{"installs":{"deepdeck 0.4.0 (path+file:///Users/me/DeepDeck/crates/ddeck)":{}}}"#;
-        assert_eq!(classify(bin, Some(path), false), Install::Source);
+        let Install::Source(dir) = classify(bin, Some(path), false) else {
+            panic!("a path install is a source build");
+        };
+        assert!(dir.ends_with("/DeepDeck/crates/ddeck"));
         assert_eq!(classify(bin, None, true), Install::Installer);
-        assert_eq!(Install::Source.upgrade_command(), None);
+        assert_eq!(
+            Install::Source("~/DeepDeck/crates/ddeck".into()).upgrade_command(),
+            "cargo install --path ~/DeepDeck/crates/ddeck --locked"
+        );
     }
 }

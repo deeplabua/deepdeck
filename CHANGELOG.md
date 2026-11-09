@@ -4,6 +4,19 @@ All notable changes to DeepDeck are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.4.2 — 2026-11-09
+
+### Added
+
+- **`u` copies the update command** shown above the footer (a click on the line does the same).
+- A build from a source checkout also gets the hint, with `cargo install --path <checkout> --locked`.
+
+### Fixed
+
+- **Hooks of a Homebrew install survive `brew upgrade`.** `ddeck setup` wrote the versioned Cellar path,
+  which an upgrade removes; it now writes `<prefix>/opt/deepdeck/bin/ddeck`. Run `ddeck setup` once after
+  upgrading to fix existing hooks.
+
 ## 0.4.1 — 2026-11-09
 
 ### Added

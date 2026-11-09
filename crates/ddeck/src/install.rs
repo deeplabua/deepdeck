@@ -20,6 +20,28 @@ pub const HOOK_EVENTS: [(&str, Option<&str>); 6] = [
 /// Seconds Claude Code waits for our hook. It normally takes a few ms.
 const HOOK_TIMEOUT_SECS: u64 = 5;
 
+/// The binary hooks should call: this one, by a path that survives upgrades.
+pub fn hook_exe() -> std::io::Result<PathBuf> {
+    Ok(stable_path(&std::env::current_exe()?.canonicalize()?))
+}
+
+/// Homebrew keeps each version in `<prefix>/Cellar/deepdeck/<version>/` and
+/// removes it on upgrade; `<prefix>/opt/deepdeck` always points at the current one.
+pub fn stable_path(exe: &Path) -> PathBuf {
+    let parts: Vec<_> = exe.components().collect();
+    if let Some(i) = parts
+        .windows(2)
+        .position(|w| w[0].as_os_str() == "Cellar" && w[1].as_os_str() == "deepdeck")
+        && parts.len() > i + 3
+    {
+        let mut p: PathBuf = parts[..i].iter().collect();
+        p.push("opt/deepdeck");
+        p.extend(&parts[i + 3..]);
+        return p;
+    }
+    exe.to_path_buf()
+}
+
 /// The command string for a binary path, quoted if it has spaces.
 pub fn hook_command(exe: &Path) -> String {
     command_for(&exe.display().to_string(), cfg!(windows))
@@ -272,6 +294,22 @@ mod tests {
     use super::*;
 
     const CMD: &str = "/Users/dev/.cargo/bin/ddeck hook";
+
+    #[test]
+    fn brew_installs_hook_the_stable_path() {
+        assert_eq!(
+            stable_path(Path::new("/opt/homebrew/Cellar/deepdeck/0.4.1/bin/ddeck")),
+            Path::new("/opt/homebrew/opt/deepdeck/bin/ddeck")
+        );
+        assert_eq!(
+            stable_path(Path::new(
+                "/home/linuxbrew/.linuxbrew/Cellar/deepdeck/0.4.1/bin/ddeck"
+            )),
+            Path::new("/home/linuxbrew/.linuxbrew/opt/deepdeck/bin/ddeck")
+        );
+        let cargo = Path::new("/Users/dev/.cargo/bin/ddeck");
+        assert_eq!(stable_path(cargo), cargo);
+    }
 
     fn herdr() -> Value {
         json!({

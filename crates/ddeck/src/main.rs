@@ -399,7 +399,7 @@ fn ctx(project: Option<PathBuf>) -> Result<cli::Ctx> {
 }
 
 fn install_hooks(path: &Path, dry_run: bool) -> Result<()> {
-    let exe = std::env::current_exe()?.canonicalize()?;
+    let exe = install::hook_exe()?;
     let (old, mut value) = install::load_settings(path)?;
     if !install::merge(&mut value, &install::hook_command(&exe))? {
         println!("DeepDeck hooks are already installed in {}", path.display());

@@ -66,6 +66,8 @@ pub struct App {
     pub order: Order,
     /// A newer release, old agent instructions: shown above the footer.
     pub notices: Vec<crate::update::Notice>,
+    /// Screen row of the first notice, from the last draw (clicks copy its command).
+    pub notice_top: u16,
 }
 
 impl App {
@@ -88,6 +90,7 @@ impl App {
             drag: None,
             order: Order::default(),
             notices: Vec::new(),
+            notice_top: u16::MAX,
         }
     }
 
@@ -233,6 +236,9 @@ impl App {
                 }
             }
             KeyCode::Char('f') => self.toggle_only(),
+            KeyCode::Char('u') if !self.notices.is_empty() => {
+                return Some(Effect::Copy(crate::update::command(&self.notices[0])));
+            }
             _ if self.screen == Screen::Timeline => self.timeline_key(key),
             KeyCode::Char('j') | KeyCode::Down => self.move_cursor(1),
             KeyCode::Char('k') | KeyCode::Up => self.move_cursor(-1),
@@ -321,6 +327,13 @@ impl App {
                     return Some(Effect::CopySelection(sel));
                 }
                 self.drag = None;
+                if let Some(n) = ev
+                    .row
+                    .checked_sub(self.notice_top)
+                    .and_then(|i| self.notices.get(usize::from(i)))
+                {
+                    return Some(Effect::Copy(crate::update::command(n)));
+                }
                 return self.click(ev.row);
             }
             _ => {}
