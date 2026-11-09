@@ -5,6 +5,7 @@ mod clipboard;
 mod doctor;
 mod herdr;
 mod hook;
+mod i18n;
 mod install;
 mod setup;
 mod status;
@@ -68,6 +69,8 @@ enum Command {
         #[arg(long, value_name = "PATH", global = true)]
         project: Option<PathBuf>,
     },
+    /// Interface language: shows it and the choices; `ddeck lang ru` sets one, `ddeck lang auto` follows the system
+    Lang { code: Option<String> },
     /// Saved project commands (runbook). Without a subcommand, lists them.
     Cmd {
         #[command(subcommand)]
@@ -265,24 +268,29 @@ fn say(line: String) -> Result<ExitCode> {
 fn run(command: Command) -> Result<ExitCode> {
     match command {
         Command::Hook { dump } => hook::run(dump),
+        Command::Lang { code } => lang(code.as_deref()),
         Command::Setup { dry_run, project } => {
             if let Some(dir) = project {
                 let path = setup::project_claude_md(&dir)?;
                 let backups = paths()?.root.join("backups");
                 if !setup::apply_block(&path, dry_run, Some(&backups))? {
-                    println!("DeepDeck instructions are up to date in {}", path.display());
+                    println!(
+                        "{}",
+                        (i18n::t().su_instr_current)(&path.display().to_string())
+                    );
                 }
                 return Ok(ExitCode::SUCCESS);
             }
             install_hooks(&install::default_settings_path()?, dry_run)?;
             let path = setup::global_claude_md()?;
             if !setup::apply_block(&path, dry_run, None)? {
-                println!("DeepDeck instructions are up to date in {}", path.display());
+                println!(
+                    "{}",
+                    (i18n::t().su_instr_current)(&path.display().to_string())
+                );
             }
             if !dry_run {
-                println!(
-                    "\nDone. New Claude Code sessions will post plans to the board; open it with `ddeck`."
-                );
+                println!("\n{}", i18n::t().su_done);
             }
             Ok(ExitCode::SUCCESS)
         }
@@ -295,14 +303,14 @@ fn run(command: Command) -> Result<ExitCode> {
                 let path = setup::project_claude_md(&dir)?;
                 let backups = paths()?.root.join("backups");
                 if !setup::unapply_block(&path, dry_run, Some(&backups))? {
-                    println!("No DeepDeck instructions in {}", path.display());
+                    println!("{}", (i18n::t().su_no_instr)(&path.display().to_string()));
                 }
                 return Ok(ExitCode::SUCCESS);
             }
             uninstall_hooks(&settings_path(settings)?, dry_run)?;
             let path = setup::global_claude_md()?;
             if !setup::unapply_block(&path, dry_run, None)? {
-                println!("No DeepDeck instructions in {}", path.display());
+                println!("{}", (i18n::t().su_no_instr)(&path.display().to_string()));
             }
             Ok(ExitCode::SUCCESS)
         }
@@ -392,7 +400,7 @@ fn run(command: Command) -> Result<ExitCode> {
             } else {
                 print!(
                     "{}",
-                    status::render(&board, now, &status::Style::for_stdout())
+                    status::render(&board, now, &status::Style::for_stdout(), i18n::t())
                 );
                 print!("{}", update::for_terminal());
             }
@@ -417,18 +425,58 @@ fn ctx(project: Option<PathBuf>) -> Result<cli::Ctx> {
     cli::Ctx::new(paths()?, project.as_deref())
 }
 
+/// `ddeck lang [code|auto]`.
+fn lang(code: Option<&str>) -> Result<ExitCode> {
+    let prefs = paths()?.tui_prefs();
+    match code {
+        None => {
+            let (now, _) = i18n::detect();
+            println!("{}", (now.strings().lang_now)(now.name(), now.code()));
+            for l in i18n::Lang::ALL {
+                let mark = if l == now { "●" } else { " " };
+                println!("  {mark} {:<8} {}", l.code(), l.name());
+            }
+        }
+        Some("auto") => {
+            i18n::set_pref(&prefs, "lang", None)?;
+            let (now, _) = i18n::detect();
+            println!(
+                "{} — {} ({})",
+                now.strings().lang_auto,
+                now.name(),
+                now.code()
+            );
+        }
+        Some(c) => {
+            let Some(l) = i18n::Lang::parse(c) else {
+                let codes: Vec<&str> = i18n::Lang::ALL.iter().map(|l| l.code()).collect();
+                anyhow::bail!(
+                    "unknown language {c:?} — one of: {}, auto",
+                    codes.join(", ")
+                );
+            };
+            i18n::set_pref(&prefs, "lang", Some(l.code().into()))?;
+            println!("{}", (l.strings().lang_set)(l.name()));
+        }
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
 fn install_hooks(path: &Path, dry_run: bool) -> Result<()> {
     let exe = install::hook_exe()?;
     let (old, mut value) = install::load_settings(path)?;
     if !install::merge(&mut value, &install::hook_command(&exe))? {
-        println!("DeepDeck hooks are already installed in {}", path.display());
+        println!(
+            "{}",
+            (i18n::t().su_hooks_present)(&path.display().to_string())
+        );
         return Ok(());
     }
     apply(path, &old, &value, dry_run)?;
     if exe.components().any(|c| c.as_os_str() == "target") {
         eprintln!(
-            "warning: hooks point to a build in target/ ({}); `cargo install --path crates/ddeck` and re-run for a stable path",
-            exe.display()
+            "{}",
+            (i18n::t().su_target_warning)(&exe.display().to_string())
         );
     }
     Ok(())
@@ -437,7 +485,7 @@ fn install_hooks(path: &Path, dry_run: bool) -> Result<()> {
 fn uninstall_hooks(path: &Path, dry_run: bool) -> Result<()> {
     let (old, mut value) = install::load_settings(path)?;
     if !install::remove(&mut value)? {
-        println!("No DeepDeck hooks in {}", path.display());
+        println!("{}", (i18n::t().su_no_hooks)(&path.display().to_string()));
         return Ok(());
     }
     apply(path, &old, &value, dry_run)
@@ -447,13 +495,16 @@ fn apply(path: &Path, old: &str, value: &serde_json::Value, dry_run: bool) -> Re
     let new = install::render(value);
     print!("{}", install::diff(path, old, &new));
     if dry_run {
-        println!("\n(dry run — nothing written)");
+        println!("\n{}", i18n::t().su_dry_run);
         return Ok(());
     }
     match install::write_with_backup(path, &new)? {
-        Some(backup) => println!("\nwrote {} (backup: {})", path.display(), backup.display()),
-        None => println!("\nwrote {}", path.display()),
+        Some(backup) => println!(
+            "\n{}",
+            (i18n::t().su_wrote_backup)(&path.display().to_string(), &backup.display().to_string())
+        ),
+        None => println!("\n{}", (i18n::t().su_wrote)(&path.display().to_string())),
     }
-    println!("Restart running Claude Code sessions (or open /hooks) to pick the change up.");
+    println!("{}", i18n::t().su_restart);
     Ok(())
 }

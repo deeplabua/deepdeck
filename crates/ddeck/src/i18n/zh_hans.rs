@@ -1,0 +1,161 @@
+//! 简体中文.
+
+use super::Strings;
+use crate::update::Notice;
+
+pub const ZH_HANS: Strings = Strings {
+    app: "DeepDeck",
+    tab_projects: "项目",
+    tab_timeline: "时间线",
+    tab_inbox: "收件箱",
+
+    state_waiting: "等你回复",
+    state_working: "工作中",
+    state_done: "完成",
+    state_idle: "空闲",
+    state_ended: "已结束",
+
+    plan: "计划",
+    you: "你:",
+    recap: "摘要:",
+    summary: "总结:",
+    notes_questions: "问题",
+    notes_ideas: "想法",
+    notes_tasks: "任务",
+    last_session: "上次会话:",
+    quiet: "空闲",
+    more_done: |n| format!("+ 已完成 {n} 项"),
+    more: |n| format!("+ 另外 {n} 项"),
+    more_sessions: |n| format!("+{n} 个会话"),
+    ago: |secs| match secs.max(0) {
+        0..60 => "刚刚".to_owned(),
+        s @ 60..3600 => format!("{}分钟", s / 60),
+        s @ 3600..86_400 => format!("{}小时", s / 3600),
+        s => format!("{}天", s / 86_400),
+    },
+
+    kind_task: "任务",
+    kind_question: "问题",
+    kind_idea: "想法",
+    input_hint: "tab 项目 · ↵ 保存 · esc 取消",
+    edit_label: "编辑",
+    copied: |how| format!("已复制 · {how}"),
+    sorted: |order| match order {
+        deepdeck_core::Order::Name => "项目按名称排序 — s: 按关注度".to_owned(),
+        deepdeck_core::Order::Attention => "项目按关注度排序 — s: 按名称".to_owned(),
+    },
+    notice: |n| match n {
+        Notice::NewVersion(v, cmd) => format!("↑ DeepDeck {v} 已发布 — {cmd}"),
+        Notice::Setup { installed: Some(v) } => format!(
+            "代理指令为 v{v}，此 ddeck 为 v{} — 请运行 ddeck setup",
+            crate::setup::BLOCK_VERSION
+        ),
+        Notice::Setup { installed: None } => {
+            "代理没有 DeepDeck 指令 — 请运行 ddeck setup".to_owned()
+        }
+    },
+    notice_copy: "  (u: 复制)",
+    herdr_outside: "o 会跳到 herdr 中的代理 — 请在 herdr 窗格中运行 ddeck",
+
+    keys: &[
+        ("o", "代理"),
+        ("y", "复制"),
+        ("s", "排序"),
+        ("f", "筛选"),
+        ("a", "任务"),
+        ("?", "问题"),
+        ("i", "想法"),
+        ("↵", "打开"),
+        ("␣", "完成"),
+        ("d", "删除"),
+        ("e", "编辑"),
+        ("q", "退出"),
+    ],
+    keys_timeline: &[("j/k", "滚动"), ("f", "此项目 / 全部"), ("q", "退出")],
+    keys_inbox: &[
+        ("o", "代理"),
+        ("y", "复制"),
+        ("f", "筛选"),
+        ("↵", "打开"),
+        ("␣", "已解决"),
+        ("m", "→ 任务"),
+        ("e", "编辑"),
+        ("?", "问题"),
+        ("i", "想法"),
+        ("q", "退出"),
+    ],
+
+    tl_plan: |n| format!("计划: {n} 步"),
+    tl_roadmap: |n| format!("路线图: {n} 步"),
+    tl_cmd: |name| format!("已保存命令: {name}"),
+    commands: "命令",
+    roadmap: "路线图",
+    tl_you_were_in: |ago, project| format!("{ago}前你在 {project}"),
+    tl_empty: "今天还没有内容。",
+    tl_retracted: "已删除发错的消息",
+    tl_moved_to: |project| format!("消息已移至 {project}"),
+    only: |name| format!("仅 {name}"),
+
+    ib_waiting: "等你回复",
+    ib_questions: "未解决的问题",
+    ib_ideas: "以后再看的想法",
+    ib_empty: "收件箱已清空。没有等你处理的事。",
+
+    empty_no_hooks: &[
+        "DeepDeck 尚未设置。",
+        "",
+        "运行:  ddeck setup --dry-run   — 查看更改",
+        "       ddeck setup             — 应用更改",
+        "",
+        "将在 ~/.claude/settings.json 中添加六个钩子，并在",
+        "~/.claude/CLAUDE.md 中添加一小段，让代理发布计划。",
+        "先做备份；其他钩子和文本保持不变。",
+    ],
+    empty_no_events: &["开始一个 Claude Code 会话 — 它会显示在这里。"],
+
+    st_none: "还没有活动。开始一个 Claude Code 会话 — 它会显示在这里。",
+    st_projects: |n| format!("DeepDeck · {n} 个项目"),
+    st_waiting: |n| format!("{n} 个等你回复"),
+    st_notes_only: "仅笔记",
+    st_sessions: |n| format!("({n} 个会话)"),
+
+    dr_binary: "程序",
+    dr_data: "数据",
+    dr_claude: "claude",
+    dr_claude_missing: "PATH 中未找到",
+    dr_hooks_in: |p| format!("钩子: {p}"),
+    dr_hook_missing: "缺失 — 请运行 `ddeck setup`",
+    dr_not_this_binary: "(不是此程序)",
+    dr_instructions: "指令",
+    dr_instr_old: |p, v, cur| format!("{p} 为 v{v}，当前为 v{cur} — 请运行 `ddeck setup`"),
+    dr_instr_none: |p| format!("{p} 中没有 — 请运行 `ddeck setup`(否则代理不会发布计划)"),
+    dr_version: "版本",
+    dr_version_new: |cur, v, cmd| format!("已安装 {cur}，{v} 已发布 — {cmd}"),
+    dr_version_ok: |cur| format!("{cur}(brew 和 cargo 已知的最新版)"),
+    dr_events: "事件",
+    dr_events_total: |p, n| format!("{p} 个项目，{n} 个事件"),
+    dr_last: |ago| format!("最近一次 {ago}前"),
+    dr_hook_errors: |n, p| format!("钩子错误({p} 中 {n} 条),最近:"),
+    dr_hook_errors_none: "钩子错误: 无",
+
+    su_dry_run: "(试运行 — 未写入任何内容)",
+    su_dry_remove: |p| format!("(试运行 — 将删除 {p})"),
+    su_removed: |p| format!("已删除 {p}"),
+    su_wrote: |p| format!("已写入 {p}"),
+    su_wrote_backup: |p, b| format!("已写入 {p}(备份: {b})"),
+    su_instr_current: |p| format!("{p} 中的 DeepDeck 指令已是最新"),
+    su_no_instr: |p| format!("{p} 中没有 DeepDeck 指令"),
+    su_hooks_present: |p| format!("DeepDeck 钩子已安装在 {p}"),
+    su_no_hooks: |p| format!("{p} 中没有 DeepDeck 钩子"),
+    su_restart: "请重启正在运行的 Claude Code 会话(或打开 /hooks)以应用更改。",
+    su_done: "完成。新的 Claude Code 会话会把计划发布到看板；用 `ddeck` 打开。",
+    su_target_warning: |p| {
+        format!(
+            "警告: 钩子指向 target/ 中的构建({p});请运行 `cargo install --path crates/ddeck` 后重试，以获得固定路径"
+        )
+    },
+
+    lang_now: |name, code| format!("语言: {name} ({code})"),
+    lang_set: |name| format!("语言: {name}"),
+    lang_auto: "语言: 已恢复为系统设置",
+};

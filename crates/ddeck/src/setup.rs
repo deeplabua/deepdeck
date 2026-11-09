@@ -130,10 +130,16 @@ pub fn unapply_block(path: &Path, dry_run: bool, backup_dir: Option<&Path>) -> R
         // Nothing but our block: no backup needed, `setup` recreates it.
         print!("{}", crate::install::diff(path, &old, ""));
         if dry_run {
-            println!("\n(dry run — {} would be removed)", path.display());
+            println!(
+                "\n{}",
+                (crate::i18n::t().su_dry_remove)(&path.display().to_string())
+            );
         } else {
             std::fs::remove_file(path).with_context(|| format!("removing {}", path.display()))?;
-            println!("\nremoved {}", path.display());
+            println!(
+                "\n{}",
+                (crate::i18n::t().su_removed)(&path.display().to_string())
+            );
         }
         return Ok(true);
     }
@@ -152,11 +158,20 @@ fn write_if_changed(
     }
     print!("{}", crate::install::diff(path, old, new));
     if dry_run {
-        println!("\n(dry run — nothing written)");
+        println!("\n{}", crate::i18n::t().su_dry_run);
     } else {
         match crate::install::write_with_backup_in(path, new, backup_dir)? {
-            Some(b) => println!("\nwrote {} (backup: {})", path.display(), b.display()),
-            None => println!("\nwrote {}", path.display()),
+            Some(b) => println!(
+                "\n{}",
+                (crate::i18n::t().su_wrote_backup)(
+                    &path.display().to_string(),
+                    &b.display().to_string()
+                )
+            ),
+            None => println!(
+                "\n{}",
+                (crate::i18n::t().su_wrote)(&path.display().to_string())
+            ),
         }
     }
     Ok(true)

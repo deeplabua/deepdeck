@@ -129,6 +129,21 @@ The board reloads itself when the binary changes, so an upgrade does not need a 
 For a status bar (tmux, herdr), `ddeck status --short` prints one number: agents waiting for you plus
 open questions. `ddeck status` prints the whole board as text.
 
+## Languages
+
+The board and the screens you read (`status`, `doctor`, `setup`) speak English, Deutsch, Español,
+Français, Italiano, 日本語, 한국어, Português (Brasil), Русский, Українська and 简体中文. The language follows
+your system (`LC_ALL` / `LC_MESSAGES` / `LANG`, on macOS the first preferred language); change it with:
+
+```sh
+ddeck lang        # the current one and the choices
+ddeck lang ru     # set one
+ddeck lang auto   # follow the system again
+```
+
+`DEEPDECK_LANG=en ddeck doctor` gives English for a bug report. What agents read (`ddeck list`, the answers
+of agent commands, the instructions block) and `--help` stay in English.
+
 ## Commands for agents
 
 The `CLAUDE.md` block teaches agents these; you can use them too. Each prints one line.

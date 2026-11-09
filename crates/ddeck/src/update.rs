@@ -124,12 +124,7 @@ pub fn for_terminal() -> String {
     let style = crate::status::Style::for_stdout();
     notices(true)
         .iter()
-        .map(|n| {
-            format!(
-                "\n{}\n",
-                style.paint("33", &(crate::tui::strings::EN.notice)(n))
-            )
-        })
+        .map(|n| format!("\n{}\n", style.paint("33", &(crate::i18n::t().notice)(n))))
         .collect()
 }
 

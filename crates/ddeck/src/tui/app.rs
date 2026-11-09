@@ -259,7 +259,7 @@ impl App {
                     .projects
                     .iter()
                     .find(|p| &p.meta.id == item.project())?;
-                return super::projects::item_text(p, item, &super::strings::EN).map(Effect::Copy);
+                return super::projects::item_text(p, item, crate::i18n::t()).map(Effect::Copy);
             }
             KeyCode::Char(c @ ('a' | '?' | 'i')) => {
                 let kind = match c {

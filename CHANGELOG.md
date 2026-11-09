@@ -4,6 +4,15 @@ All notable changes to DeepDeck are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.5.0 — 2026-11-09
+
+### Added
+
+- **Eleven languages.** The board, `ddeck status`, `doctor`, `setup` and the update hints in English, German,
+  Spanish, French, Italian, Japanese, Korean, Brazilian Portuguese, Russian, Ukrainian and Simplified Chinese.
+  The language follows the system; `ddeck lang <code>` sets one, `ddeck lang auto` follows the system again,
+  `DEEPDECK_LANG` overrides both. What agents read stays in English.
+
 ## 0.4.3 — 2026-11-09
 
 ### Added

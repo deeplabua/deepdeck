@@ -31,7 +31,9 @@ use crate::install;
 use app::{App, Effect, Screen};
 use projects::{View, layout_projects};
 use source::Source;
-use strings::{EN, Strings};
+#[cfg(test)]
+use strings::EN;
+use strings::Strings;
 use theme::Theme;
 
 /// How long a key wait lasts before the logs are polled again.
@@ -86,7 +88,7 @@ pub fn run(paths: Paths, settings_path: &Path) -> Result<()> {
                     &source,
                     now,
                     message.as_deref(),
-                    &EN,
+                    crate::i18n::t(),
                     &Theme::from_env(),
                 );
                 if let Some(sel) = app.drag.filter(|s| !s.is_empty()) {
@@ -123,26 +125,26 @@ pub fn run(paths: Paths, settings_path: &Path) -> Result<()> {
                     Some(Effect::SaveOrder(order)) => {
                         let saved = save_order(&source.paths().tui_prefs(), order);
                         message = Some(match saved {
-                            Ok(()) => (EN.sorted)(order),
+                            Ok(()) => (crate::i18n::t().sorted)(order),
                             Err(e) => format!("{e}"),
                         });
                     }
                     Some(Effect::CopySelection(sel)) => {
                         let text = sel.text(&screen);
                         message = Some(match crate::clipboard::copy(&text) {
-                            Ok(how) => (EN.copied)(how),
+                            Ok(how) => (crate::i18n::t().copied)(how),
                             Err(e) => e,
                         });
                     }
                     Some(Effect::Copy(text)) => {
                         message = Some(match crate::clipboard::copy(&text) {
-                            Ok(how) => (EN.copied)(how),
+                            Ok(how) => (crate::i18n::t().copied)(how),
                             Err(e) => e,
                         });
                     }
                     Some(Effect::Focus { pane, root }) => {
                         message = Some(if !crate::herdr::available() {
-                            EN.herdr_outside.to_owned()
+                            crate::i18n::t().herdr_outside.to_owned()
                         } else {
                             match crate::herdr::focus(pane.as_deref(), &root) {
                                 Ok(()) => String::new(),
@@ -244,13 +246,10 @@ fn load_order(path: &Path) -> deepdeck_core::Order {
         .unwrap_or_default()
 }
 
+/// Keeps the other preferences (the language) in the same file.
 fn save_order(path: &Path, order: deepdeck_core::Order) -> std::io::Result<()> {
-    let json = serde_json::to_vec(&serde_json::json!({ "order": order }))
-        .map_err(std::io::Error::other)?;
-    if let Some(dir) = path.parent() {
-        store::ensure_private_dir(dir)?;
-    }
-    std::fs::write(path, json)
+    let value = serde_json::to_value(order).map_err(std::io::Error::other)?;
+    crate::i18n::set_pref(path, "order", Some(value))
 }
 
 /// Replace this process with the freshly installed binary, same arguments.
@@ -548,7 +547,7 @@ fn draw_footer(
         .and_then(|id| app.board.projects.iter().find(|p| &p.meta.id == id))
         .map(|p| p.meta.name.clone())
     {
-        let label = format!("{} {name}  ", t.only);
+        let label = format!("{}  ", (t.only)(&name));
         used += text::width(&label);
         spans.push(Span::styled(label, th.accent()));
     }

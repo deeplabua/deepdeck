@@ -7,6 +7,8 @@ use deepdeck_core::hooks::truncate_chars;
 use deepdeck_core::{AgentState, Board, NoteType, ProjectView, TaskStatus};
 use jiff::{SignedDuration, Timestamp};
 
+use crate::i18n::Strings;
+
 pub struct Style {
     pub color: bool,
 }
@@ -53,25 +55,18 @@ pub fn render_short(board: &Board) -> String {
     (board.waiting_count() + questions).to_string()
 }
 
-pub fn render(board: &Board, now: Timestamp, style: &Style) -> String {
+pub fn render(board: &Board, now: Timestamp, style: &Style, t: &Strings) -> String {
     let mut out = String::new();
     if board.projects.is_empty() {
-        out.push_str("No activity yet. Start a Claude Code session — it will show up here.\n");
+        out.push_str(t.st_none);
+        out.push('\n');
         return out;
     }
     let waiting = board.waiting_count();
     let n = board.projects.len();
-    let _ = write!(
-        out,
-        "DeepDeck · {n} project{}",
-        if n == 1 { "" } else { "s" }
-    );
+    out.push_str(&(t.st_projects)(n));
     if waiting > 0 {
-        let _ = write!(
-            out,
-            " · {}",
-            style.paint("33", &format!("{waiting} waiting for you"))
-        );
+        let _ = write!(out, " · {}", style.paint("33", &(t.st_waiting)(waiting)));
     }
     out.push('\n');
     let width = board
@@ -82,31 +77,41 @@ pub fn render(board: &Board, now: Timestamp, style: &Style) -> String {
         .unwrap_or(0);
     for p in &board.projects {
         out.push('\n');
-        render_project(&mut out, p, width, now, style);
+        render_project(&mut out, p, width, now, style, t);
     }
     out
 }
 
-fn render_project(out: &mut String, p: &ProjectView, width: usize, now: Timestamp, style: &Style) {
+fn render_project(
+    out: &mut String,
+    p: &ProjectView,
+    width: usize,
+    now: Timestamp,
+    style: &Style,
+    t: &Strings,
+) {
     let name = format!("{:width$}", p.meta.name);
     let Some(agent) = p.headline() else {
-        let _ = writeln!(out, "  {name}  notes only");
+        let _ = writeln!(out, "  {name}  {}", t.st_notes_only);
         render_notes(out, p, style);
         return;
     };
-    let ago = ago(now, agent.state.since());
+    let ago = (t.ago)(now.duration_since(agent.state.since()).as_secs());
     let (mark, label) = match &agent.state {
         AgentState::Waiting { .. } => (
             style.paint("33", "●"),
-            style.paint("33", &format!("waiting for you · {ago}")),
+            style.paint("33", &format!("{} · {ago}", t.state_waiting)),
         ),
-        AgentState::Working { .. } => (style.paint("35", "◐"), format!("working · {ago}")),
-        AgentState::Stopped { .. } => (style.paint("32", "✓"), format!("done · {ago}")),
-        AgentState::Idle { .. } => (style.paint("90", "○"), format!("idle · {ago}")),
-        AgentState::Ended { .. } => (style.paint("90", "○"), format!("ended · {ago}")),
+        AgentState::Working { .. } => (
+            style.paint("35", "◐"),
+            format!("{} · {ago}", t.state_working),
+        ),
+        AgentState::Stopped { .. } => (style.paint("32", "✓"), format!("{} · {ago}", t.state_done)),
+        AgentState::Idle { .. } => (style.paint("90", "○"), format!("{} · {ago}", t.state_idle)),
+        AgentState::Ended { .. } => (style.paint("90", "○"), format!("{} · {ago}", t.state_ended)),
     };
     let agents = if p.agents.len() > 1 {
-        format!("  ({} sessions)", p.agents.len())
+        format!("  {}", (t.st_sessions)(p.agents.len()))
     } else {
         String::new()
     };
@@ -121,7 +126,7 @@ fn render_project(out: &mut String, p: &ProjectView, width: usize, now: Timestam
             .current_task()
             .map(|t| format!(" → {}", truncate_chars(&t.subject, 60)))
             .unwrap_or_default();
-        let _ = writeln!(out, "  plan {done}/{total}{current}");
+        let _ = writeln!(out, "  {} {done}/{total}{current}", t.plan);
         for t in agent
             .tasks
             .iter()
@@ -139,7 +144,7 @@ fn render_project(out: &mut String, p: &ProjectView, width: usize, now: Timestam
         let _ = writeln!(
             out,
             "  {} {}",
-            style.paint("90", "you:"),
+            style.paint("90", t.you),
             truncate_chars(prompt, 68)
         );
     }
@@ -147,7 +152,7 @@ fn render_project(out: &mut String, p: &ProjectView, width: usize, now: Timestam
         let _ = writeln!(
             out,
             "  {} {}",
-            style.paint("90", "recap:"),
+            style.paint("90", t.recap),
             truncate_chars(recap, 66)
         );
     }
@@ -162,17 +167,6 @@ fn render_notes(out: &mut String, p: &ProjectView, style: &Style) {
             NoteType::Task => "○".to_owned(),
         };
         let _ = writeln!(out, "  {m} {}", truncate_chars(&n.text, 70));
-    }
-}
-
-/// `now`, `5m`, `2h`, `3d`.
-pub fn ago(now: Timestamp, then: Timestamp) -> String {
-    let secs = now.duration_since(then).as_secs().max(0);
-    match secs {
-        0..60 => "now".into(),
-        60..3600 => format!("{}m", secs / 60),
-        3600..86_400 => format!("{}h", secs / 3600),
-        _ => format!("{}d", secs / 86_400),
     }
 }
 
@@ -226,7 +220,7 @@ mod tests {
             ),
         ];
         let board = fold([(ProjectMeta::for_root(Path::new("/p/DeepVault")), events)]);
-        let text = render(&board, at(4), &Style { color: false });
+        let text = render(&board, at(4), &Style { color: false }, &crate::i18n::EN);
         assert_eq!(
             text,
             "DeepDeck · 1 project · 1 waiting for you\n\
@@ -248,13 +242,5 @@ mod tests {
         )]);
         assert_eq!(recent(board.clone(), at(60), Some(2)).projects.len(), 1);
         assert_eq!(recent(board, at(60 * 13), Some(12)).projects.len(), 0);
-    }
-
-    #[test]
-    fn ago_buckets() {
-        assert_eq!(ago(at(0), at(0)), "now");
-        assert_eq!(ago(at(5), at(0)), "5m");
-        assert_eq!(ago(at(125), at(0)), "2h");
-        assert_eq!(ago(at(60 * 50), at(0)), "2d");
     }
 }
