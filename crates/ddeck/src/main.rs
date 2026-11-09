@@ -218,7 +218,21 @@ fn main() -> ExitCode {
         hook::run(args.any(|a| a == "--dump"));
     }
 
-    let cli = Cli::parse();
+    let cli = match Cli::try_parse() {
+        Ok(cli) => cli,
+        // `-V` and `-h`: a person asking — a newer version is worth a line after.
+        Err(e)
+            if matches!(
+                e.kind(),
+                clap::error::ErrorKind::DisplayVersion | clap::error::ErrorKind::DisplayHelp
+            ) =>
+        {
+            let _ = e.print();
+            print!("{}", update::for_terminal());
+            return ExitCode::SUCCESS;
+        }
+        Err(e) => e.exit(),
+    };
     let res = match cli.command {
         Some(command) => run(command),
         None => paths()
@@ -320,6 +334,7 @@ fn run(command: Command) -> Result<ExitCode> {
                 }
                 None => {
                     print!("{}", cli::cmd_list(&ctx, &status::Style::for_stdout())?);
+                    print!("{}", update::for_terminal());
                     Ok(ExitCode::SUCCESS)
                 }
             }
@@ -356,6 +371,9 @@ fn run(command: Command) -> Result<ExitCode> {
         Command::Done { id, project } => say(cli::done(&ctx(project)?, &id)?),
         Command::List { json, project } => {
             print!("{}", cli::list(&ctx(project)?, json)?);
+            if !json {
+                print!("{}", update::for_terminal());
+            }
             Ok(ExitCode::SUCCESS)
         }
         Command::Snippet => say(setup::block()),
@@ -376,6 +394,7 @@ fn run(command: Command) -> Result<ExitCode> {
                     "{}",
                     status::render(&board, now, &status::Style::for_stdout())
                 );
+                print!("{}", update::for_terminal());
             }
             Ok(ExitCode::SUCCESS)
         }

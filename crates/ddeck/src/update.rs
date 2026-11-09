@@ -113,6 +113,26 @@ fn source_dir(key: &str) -> String {
     }
 }
 
+/// For `ddeck list` and `ddeck status` run by a person: the notices after the
+/// output. Agents run these commands with a pipe, not a terminal — they never
+/// see them and so never act on them.
+pub fn for_terminal() -> String {
+    use std::io::IsTerminal as _;
+    if !std::io::stdout().is_terminal() {
+        return String::new();
+    }
+    let style = crate::status::Style::for_stdout();
+    notices(true)
+        .iter()
+        .map(|n| {
+            format!(
+                "\n{}\n",
+                style.paint("33", &(crate::tui::strings::EN.notice)(n))
+            )
+        })
+        .collect()
+}
+
 /// The text to copy for a notice: the command it names.
 pub fn command(n: &Notice) -> String {
     match n {

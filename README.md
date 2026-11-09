@@ -69,7 +69,8 @@ again. Then run `ddeck setup` if the board asks for it — a new version may bri
 The board tells you when a newer DeepDeck is out and shows the command for your install. It learns that from
 files brew and cargo already keep (the tap's formula, cargo's index cache) — DeepDeck itself never goes online,
 so the hint appears once brew or cargo has refreshed (any `brew update`, `install` or `upgrade` does it).
-`ddeck doctor` shows the same.
+`ddeck doctor` shows the same, and so do `ddeck list`, `ddeck status`, `ddeck cmd`, `ddeck -V` and `ddeck -h` when you run them in a terminal
+(agents, which read them through a pipe, don't see it).
 
 ## Set up
 

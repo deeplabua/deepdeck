@@ -46,6 +46,8 @@ pub struct Strings {
     pub sorted: fn(deepdeck_core::Order) -> String,
     /// Above the footer: a newer release, old agent instructions.
     pub notice: fn(&crate::update::Notice) -> String,
+    /// After a notice on the board.
+    pub notice_copy: &'static str,
     /// `o` pressed outside herdr.
     pub herdr_outside: &'static str,
 
@@ -133,16 +135,17 @@ pub const EN: Strings = Strings {
     },
     notice: |n| match n {
         crate::update::Notice::NewVersion(v, cmd) => {
-            format!("↑ DeepDeck {v} is out — {cmd}  (u: copy)")
+            format!("↑ DeepDeck {v} is out — {cmd}")
         }
         crate::update::Notice::Setup { installed: Some(v) } => format!(
-            "agent instructions are v{v}, this ddeck has v{} — run ddeck setup  (u: copy)",
+            "agent instructions are v{v}, this ddeck has v{} — run ddeck setup",
             crate::setup::BLOCK_VERSION
         ),
         crate::update::Notice::Setup { installed: None } => {
-            "agents have no DeepDeck instructions — run ddeck setup  (u: copy)".to_owned()
+            "agents have no DeepDeck instructions — run ddeck setup".to_owned()
         }
     },
+    notice_copy: "  (u: copy)",
     herdr_outside: "o jumps to the agent in herdr — run ddeck in a herdr pane",
 
     keys: &[

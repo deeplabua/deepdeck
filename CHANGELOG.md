@@ -4,6 +4,13 @@ All notable changes to DeepDeck are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.4.3 — 2026-11-09
+
+### Added
+
+- **`ddeck list`, `ddeck status`, `ddeck cmd`, `-V` and `-h` show the same hints** (a newer version, `ddeck setup`) at the end — only in a
+  terminal. Agents read these commands through a pipe, so they never see the hint and never act on it.
+
 ## 0.4.2 — 2026-11-09
 
 ### Added

@@ -9,7 +9,7 @@ mod input;
 mod projects;
 mod select;
 mod source;
-mod strings;
+pub(crate) mod strings;
 mod text;
 mod theme;
 mod timeline;
@@ -292,7 +292,10 @@ fn draw(
         .iter()
         .map(|n| {
             Line::styled(
-                text::fit(&format!(" {}", (t.notice)(n)), usize::from(notices.width)),
+                text::fit(
+                    &format!(" {}{}", (t.notice)(n), t.notice_copy),
+                    usize::from(notices.width),
+                ),
                 th.waiting(),
             )
         })
