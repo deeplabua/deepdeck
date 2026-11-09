@@ -9,6 +9,7 @@ mod install;
 mod setup;
 mod status;
 mod tui;
+mod update;
 
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;

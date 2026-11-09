@@ -44,6 +44,8 @@ pub struct Strings {
     pub copied: fn(&str) -> String,
     /// After `s`: the new project order.
     pub sorted: fn(deepdeck_core::Order) -> String,
+    /// Above the footer: a newer release, old agent instructions.
+    pub notice: fn(&crate::update::Notice) -> String,
     /// `o` pressed outside herdr.
     pub herdr_outside: &'static str,
 
@@ -128,6 +130,16 @@ pub const EN: Strings = Strings {
     sorted: |order| match order {
         deepdeck_core::Order::Name => "projects by name — s: by attention".to_owned(),
         deepdeck_core::Order::Attention => "projects by attention — s: by name".to_owned(),
+    },
+    notice: |n| match n {
+        crate::update::Notice::NewVersion(v, cmd) => format!("↑ DeepDeck {v} is out — {cmd}"),
+        crate::update::Notice::Setup { installed: Some(v) } => format!(
+            "agent instructions are v{v}, this ddeck has v{} — run ddeck setup",
+            crate::setup::BLOCK_VERSION
+        ),
+        crate::update::Notice::Setup { installed: None } => {
+            "agents have no DeepDeck instructions — run ddeck setup".to_owned()
+        }
     },
     herdr_outside: "o jumps to the agent in herdr — run ddeck in a herdr pane",
 

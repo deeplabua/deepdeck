@@ -98,6 +98,23 @@ instructions  ? {e:#}"
         ),
     }
 
+    // A newer release brew or cargo already knows about (no network).
+    match crate::update::notices(false)
+        .into_iter()
+        .find_map(|n| match n {
+            crate::update::Notice::NewVersion(v, cmd) => Some((v, cmd)),
+            crate::update::Notice::Setup { .. } => None,
+        }) {
+        Some((v, cmd)) => println!(
+            "\nversion       ! {} installed, {v} is out — {cmd}",
+            env!("CARGO_PKG_VERSION")
+        ),
+        None => println!(
+            "\nversion       ✓ {} (newest that brew and cargo have seen)",
+            env!("CARGO_PKG_VERSION")
+        ),
+    }
+
     // Log.
     println!("\nevents");
     let projects = store::load_all(paths)?;

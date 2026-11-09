@@ -4,6 +4,15 @@ All notable changes to DeepDeck are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.4.1 — 2026-11-09
+
+### Added
+
+- **The board says when to update.** A line above the footer shows a newer DeepDeck that brew or cargo has
+  already seen, with the upgrade command for this install (brew, cargo or the installer), and agent
+  instructions older than this binary (`ddeck setup`). Read from files brew and cargo keep — no network.
+  `ddeck doctor` shows the same.
+
 ## 0.4.0 — 2026-11-09
 
 ### Added

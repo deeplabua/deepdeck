@@ -61,6 +61,16 @@ cargo install deepdeck
 
 Or download a prebuilt binary from the [releases page](https://github.com/deeplabua/deepdeck/releases).
 
+### Updating
+
+Update the way you installed: `brew upgrade deepdeck`, `cargo install deepdeck --locked`, or run the installer
+again. Then run `ddeck setup` if the board asks for it — a new version may bring new agent instructions.
+
+The board tells you when a newer DeepDeck is out and shows the command for your install. It learns that from
+files brew and cargo already keep (the tap's formula, cargo's index cache) — DeepDeck itself never goes online,
+so the hint appears once brew or cargo has refreshed (any `brew update`, `install` or `upgrade` does it).
+`ddeck doctor` shows the same.
+
 ## Set up
 
 ```sh

@@ -64,6 +64,8 @@ pub struct App {
     pub drag: Option<Selection>,
     /// How projects are listed; `s` toggles.
     pub order: Order,
+    /// A newer release, old agent instructions: shown above the footer.
+    pub notices: Vec<crate::update::Notice>,
 }
 
 impl App {
@@ -85,6 +87,7 @@ impl App {
             only: None,
             drag: None,
             order: Order::default(),
+            notices: Vec::new(),
         }
     }
 

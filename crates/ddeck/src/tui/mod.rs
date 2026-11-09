@@ -38,6 +38,8 @@ use theme::Theme;
 const TICK: Duration = Duration::from_millis(250);
 /// Projects quiet for longer than this are hidden (unless they have notes).
 const ACTIVE_HOURS: i64 = 12;
+/// Notices are re-read every this many ticks (~1 min).
+const NOTICE_EVERY: u32 = 240;
 
 pub fn run(paths: Paths, settings_path: &Path) -> Result<()> {
     let hooks_installed = install::load_settings(settings_path)
@@ -55,6 +57,8 @@ pub fn run(paths: Paths, settings_path: &Path) -> Result<()> {
         hooks_installed,
     );
     app.set_order(load_order(&source.paths().tui_prefs()));
+    app.notices = crate::update::notices(hooks_installed);
+    let mut ticks: u32 = 0;
 
     let mut watch = BinaryWatch::new();
     let mut terminal = ratatui::init();
@@ -152,6 +156,11 @@ pub fn run(paths: Paths, settings_path: &Path) -> Result<()> {
             }
             if source.poll()? {
                 app.set_board(source.board(Timestamp::now(), ACTIVE_HOURS));
+            }
+            // brew may have learned of a release, `ddeck setup` may have run: about once a minute.
+            ticks = ticks.wrapping_add(1);
+            if ticks.is_multiple_of(NOTICE_EVERY) {
+                app.notices = crate::update::notices(app.hooks_installed);
             }
             // A new ddeck was installed: restart into it, unless the user is typing.
             if app.input.is_none() && watch.updated() {
@@ -270,12 +279,25 @@ fn draw(
     t: &Strings,
     th: &Theme,
 ) {
-    let [header, body, footer] = Layout::vertical([
+    let notice_rows = u16::try_from(app.notices.len()).unwrap_or(0);
+    let [header, body, notices, footer] = Layout::vertical([
         Constraint::Length(1),
         Constraint::Min(1),
+        Constraint::Length(notice_rows),
         Constraint::Length(1),
     ])
     .areas(f.area());
+    let lines: Vec<Line<'_>> = app
+        .notices
+        .iter()
+        .map(|n| {
+            Line::styled(
+                text::fit(&format!(" {}", (t.notice)(n)), usize::from(notices.width)),
+                th.waiting(),
+            )
+        })
+        .collect();
+    f.render_widget(Paragraph::new(lines), notices);
     draw_header(f, header, app, t, th);
     match app.screen {
         Screen::Projects => draw_projects(f, body, app, now, t, th),
