@@ -4,6 +4,21 @@ All notable changes to DeepDeck are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.6.1 — 2026-11-11
+
+### Changed
+
+- **Agent instructions (block v8):** the roadmap holds the project's own steps. What the user has to check,
+  try or decide goes to «your part» (`ddeck handoff`), and steps of that kind already on a roadmap move there.
+
+- A long command under «your part» wraps onto the next rows, spaces kept as typed, instead of being cut with
+  `…`; a click on any of its rows copies it.
+
+### Fixed
+
+- A status line such as «copied · pbcopy» clears itself after a few seconds instead of staying until the
+  next key press.
+
 ## 0.6.0 — 2026-11-11
 
 ### Added

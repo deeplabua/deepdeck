@@ -272,6 +272,50 @@ mod tests {
     }
 
     #[test]
+    fn long_command_wraps_and_every_row_copies_it() {
+        let run = "sh /private/tmp/claude-501/scratchpad/allow-ddeck.sh --yes";
+        let board = fold([(
+            ProjectMeta::for_root(Path::new("/p/DeepDeck")),
+            vec![Event::new(
+                at(0),
+                Source::Agent,
+                None,
+                EventBody::NoteAdd {
+                    id: "h1".into(),
+                    note_type: NoteType::Handoff,
+                    text: "Allow".into(),
+                    run: Some(run.into()),
+                },
+            )],
+        )]);
+        let r = layout_inbox(
+            &board,
+            at(1),
+            30,
+            &View {
+                selected: None,
+                open: &Default::default(),
+            },
+            &EN,
+            &Theme { color: false },
+        );
+        let lines: Vec<String> = r.lines.iter().map(plain).collect();
+        assert_eq!(
+            lines,
+            [
+                " YOUR PART · 1",
+                "  → Allow             DeepDeck",
+                "    $ sh /private/tmp/claude-5",
+                "      01/scratchpad/allow-ddec",
+                "      k.sh --yes",
+            ]
+        );
+        let rows: Vec<usize> = r.copy_rows.iter().map(|(i, _)| *i).collect();
+        assert_eq!(rows, [2, 3, 4]);
+        assert!(r.copy_rows.iter().all(|(_, c)| c == run));
+    }
+
+    #[test]
     fn empty_inbox() {
         let r = layout_inbox(
             &Board::default(),

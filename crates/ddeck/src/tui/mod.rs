@@ -42,6 +42,8 @@ const TICK: Duration = Duration::from_millis(250);
 const ACTIVE_HOURS: i64 = 12;
 /// Notices are re-read every this many ticks (~1 min).
 const NOTICE_EVERY: u32 = 240;
+/// A status message (copied, sorted, an error) is cleared after this long.
+const MESSAGE_FOR: Duration = Duration::from_secs(4);
 
 pub fn run(paths: Paths, settings_path: &Path) -> Result<()> {
     let hooks_installed = install::load_settings(settings_path)
@@ -79,6 +81,7 @@ pub fn run(paths: Paths, settings_path: &Path) -> Result<()> {
     }));
     let res = (|| -> Result<Exit> {
         let mut message: Option<String> = None;
+        let mut message_until = std::time::Instant::now();
         loop {
             let now = Timestamp::now();
             let frame = terminal.draw(|f| {
@@ -109,6 +112,7 @@ pub fn run(paths: Paths, settings_path: &Path) -> Result<()> {
             } else {
                 None
             };
+            let had_effect = effect.is_some();
             {
                 match effect {
                     Some(Effect::Quit) => return Ok(Exit::Quit),
@@ -155,6 +159,12 @@ pub fn run(paths: Paths, settings_path: &Path) -> Result<()> {
                     }
                     None => {}
                 }
+            }
+            // A message lives a few seconds, not until the next key press.
+            if had_effect && message.is_some() {
+                message_until = std::time::Instant::now() + MESSAGE_FOR;
+            } else if message.is_some() && std::time::Instant::now() >= message_until {
+                message = None;
             }
             if source.poll()? {
                 app.set_board(source.board(Timestamp::now(), ACTIVE_HOURS));

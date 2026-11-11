@@ -108,19 +108,44 @@ pub struct Rendered {
     pub copy_rows: Vec<(usize, String)>,
 }
 
-/// A handoff's command under its text (`$` in the text's column), copied by a click.
+/// A handoff's command under its text (`$` in the text's column), wrapped in
+/// full so it can be read before it is run; each of its rows copies it on a click.
 pub fn run_line(r: &mut Rendered, column: usize, run: &str, th: &Theme, width: usize) {
-    r.copy_rows.push((r.lines.len(), run.to_owned()));
-    r.lines.push(row(
-        vec![
-            Span::raw(" ".repeat(column)),
-            Span::styled("$ ", th.question()),
-        ],
-        run,
-        th.dim(),
-        None,
-        width,
-    ));
+    let indent = column + 2;
+    for (i, chunk) in cut_columns(run, width.saturating_sub(indent))
+        .into_iter()
+        .enumerate()
+    {
+        let lead = if i == 0 {
+            vec![
+                Span::raw(" ".repeat(column)),
+                Span::styled("$ ", th.question()),
+            ]
+        } else {
+            vec![Span::raw(" ".repeat(indent))]
+        };
+        r.copy_rows.push((r.lines.len(), run.to_owned()));
+        r.lines.push(row(lead, &chunk, th.dim(), None, width));
+    }
+}
+
+/// Cut `s` into pieces of at most `max` columns, keeping every character and
+/// space as typed: a command is read as it will be pasted, not reflowed.
+fn cut_columns(s: &str, max: usize) -> Vec<String> {
+    use unicode_width::UnicodeWidthChar;
+    let max = max.max(2);
+    let mut out = vec![String::new()];
+    let mut used = 0;
+    for c in s.chars() {
+        let w = c.width().unwrap_or(0);
+        if used + w > max {
+            out.push(String::new());
+            used = 0;
+        }
+        out.last_mut().expect("never empty").push(c);
+        used += w;
+    }
+    out
 }
 
 pub fn layout_projects(
