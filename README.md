@@ -104,7 +104,8 @@ Run `ddeck` in a side panel (60 columns is plenty). Three screens:
   and tasks. Idle projects with nothing open share one compact line; after 12 quiet hours a project
   drops off unless it still has open items.
 - **Timeline** — your prompts and the agents' short answers, newest first, across projects or just one.
-- **Inbox** — what needs you: waiting agents and open questions.
+- **Inbox** — what needs you: waiting agents, your part (checks and commands agents handed to you) and
+  open questions.
 
 | Key | Action |
 | --- | --- |
@@ -154,6 +155,8 @@ ddeck step 2 doing                                     # progress: doing | done
 ddeck roadmap set "Release 0.3" "Shell completions"    # what comes after this request
 ddeck roadmap step 1 done
 ddeck ask "Keep the old flag as an alias?"             # a question only you can answer
+ddeck handoff "Check the export on the phone"          # your part: a step only you can do
+ddeck handoff "Allow the tap" --run 'brew tap x/y'     # …or a command for you to run (y copies it)
 ddeck idea "Cache the index between runs"              # for later
 ddeck add "Update the README"                          # a task
 ddeck done <id>
@@ -162,6 +165,13 @@ ddeck list                                             # the project's plan and 
 ddeck retract "a few words"                            # a message sent to the wrong session
 ddeck cmd add "release" 'scripts/release.sh 0.3.0'     # a project command worth keeping
 ```
+
+### Your part
+
+Some steps only you can take: a check on a phone, a login, a decision, a command the agent may not run. Agents
+put them under **your part** (`ddeck handoff`), in the Inbox across all projects, right after the agents
+waiting for you. A command shows as `$ …` under its step: `y` or a click copies it, you run it yourself —
+DeepDeck never runs it. Mark the step done with space.
 
 ### Saved commands
 

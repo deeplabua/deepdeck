@@ -48,6 +48,8 @@ pub struct App {
     pub items: Vec<Item>,
     /// Where each item starts in the scrolled content, from the last layout (mouse).
     pub rows: Vec<(Item, usize)>,
+    /// Content rows that copy a command when clicked (handoffs' `$ …` lines).
+    pub copy_rows: Vec<(usize, String)>,
     /// Screen row where the body starts, and tab hit areas `(screen, x0..x1)`.
     pub body_top: u16,
     pub tabs: Vec<(Screen, std::ops::Range<u16>)>,
@@ -79,6 +81,7 @@ impl App {
             selected: None,
             items: Vec::new(),
             rows: Vec::new(),
+            copy_rows: Vec::new(),
             body_top: 1,
             tabs: Vec::new(),
             open: HashSet::new(),
@@ -209,6 +212,7 @@ impl App {
                             id: note_id(now),
                             note_type: line.kind,
                             text,
+                            run: None,
                         },
                     };
                     Some(Effect::Write(line.project, vec![body]))
@@ -347,6 +351,9 @@ impl App {
             return None;
         }
         let line = usize::from(row - self.body_top) + self.scroll;
+        if let Some((_, run)) = self.copy_rows.iter().find(|(r, _)| *r == line) {
+            return Some(Effect::Copy(run.clone()));
+        }
         // The item whose lines contain the click: the last one starting at or above it.
         let (item, _) = self
             .rows
@@ -415,7 +422,8 @@ impl App {
             // Question or idea → a task with the same text.
             KeyCode::Char('m') => {
                 let (note, _) = self.note(&project, &id)?;
-                if note.note_type == NoteType::Task {
+                // A handoff is already the user's own step, and its command would be lost.
+                if matches!(note.note_type, NoteType::Task | NoteType::Handoff) {
                     return None;
                 }
                 let text = note.text.clone();
@@ -427,6 +435,7 @@ impl App {
                             id: format!("{id}_t"),
                             note_type: NoteType::Task,
                             text,
+                            run: None,
                         },
                     ],
                 ))
@@ -475,6 +484,7 @@ mod tests {
                 id: "n1".into(),
                 note_type: NoteType::Idea,
                 text: "csv".into(),
+                run: None,
             },
         );
         let mut app = App::new(fold([(meta, vec![note])]), true);
@@ -499,6 +509,7 @@ mod tests {
             id: note_id(now()),
             note_type: NoteType::Idea,
             text: "экспортq".into(),
+            run: None,
         };
         assert_eq!(e, Some(Effect::Write(id, vec![add])));
         assert!(app.input.is_none());
@@ -665,6 +676,7 @@ mod tests {
                 id: "n1".into(),
                 note_type: NoteType::Idea,
                 text: "csv".into(),
+                run: None,
             },
         );
         app.board = fold([(
@@ -738,6 +750,13 @@ mod tests {
         app.handle_key(key('j'), now());
         assert_eq!(app.drag, None);
 
+        // A handoff's `$` line copies its command (content line 5).
+        app.copy_rows = vec![(5, "sh allow.sh".into())];
+        assert_eq!(
+            click(&mut app, 5, 6),
+            Some(Effect::Copy("sh allow.sh".into()))
+        );
+
         click(&mut app, 32, 0);
         assert_eq!(app.screen, Screen::Inbox);
         app.handle_mouse(ev(MouseEventKind::ScrollUp, 0, 3));
@@ -765,7 +784,8 @@ mod tests {
                     EventBody::NoteAdd {
                         id: "n1_t".into(),
                         note_type: NoteType::Task,
-                        text: "csv".into()
+                        text: "csv".into(),
+                        run: None,
                     },
                 ]
             ))

@@ -22,6 +22,7 @@ pub const ZH_HANS: Strings = Strings {
     notes_questions: "问题",
     notes_ideas: "想法",
     notes_tasks: "任务",
+    notes_handoffs: "由你来做",
     last_session: "上次会话:",
     quiet: "空闲",
     more_done: |n| format!("+ 已完成 {n} 项"),
@@ -37,6 +38,7 @@ pub const ZH_HANS: Strings = Strings {
     kind_task: "任务",
     kind_question: "问题",
     kind_idea: "想法",
+    kind_handoff: "由你来做",
     input_hint: "tab 项目 · ↵ 保存 · esc 取消",
     edit_label: "编辑",
     copied: |how| format!("已复制 · {how}"),
@@ -99,6 +101,7 @@ pub const ZH_HANS: Strings = Strings {
     ib_waiting: "等你回复",
     ib_questions: "未解决的问题",
     ib_ideas: "以后再看的想法",
+    ib_handoffs: "由你来做",
     ib_empty: "收件箱已清空。没有等你处理的事。",
 
     empty_no_hooks: &[

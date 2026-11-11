@@ -149,6 +149,7 @@ pub fn layout_timeline(
                     id,
                     note_type,
                     text,
+                    ..
                 } => {
                     notes.insert(id.as_str(), (*note_type, text.clone()));
                     let (m, s) = note_mark(*note_type, th);
@@ -250,6 +251,7 @@ fn note_mark(t: NoteType, th: &Theme) -> (&'static str, Style) {
         NoteType::Question => ("?", th.question()),
         NoteType::Idea => ("◆", th.idea()),
         NoteType::Task => ("○", th.dim()),
+        NoteType::Handoff => ("→", th.waiting()),
     }
 }
 

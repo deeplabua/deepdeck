@@ -22,6 +22,7 @@ pub const ES: Strings = Strings {
     notes_questions: "preguntas",
     notes_ideas: "ideas",
     notes_tasks: "tareas",
+    notes_handoffs: "te toca",
     last_session: "última sesión:",
     quiet: "inactivos",
     more_done: |n| format!("+ {n} hechas"),
@@ -43,6 +44,7 @@ pub const ES: Strings = Strings {
     kind_task: "tarea",
     kind_question: "pregunta",
     kind_idea: "idea",
+    kind_handoff: "te toca",
     input_hint: "tab proyecto · ↵ guardar · esc cancelar",
     edit_label: "editar",
     copied: |how| format!("copiado · {how}"),
@@ -121,6 +123,7 @@ pub const ES: Strings = Strings {
     ib_waiting: "TE ESPERAN",
     ib_questions: "PREGUNTAS ABIERTAS",
     ib_ideas: "IDEAS PARA DESPUÉS",
+    ib_handoffs: "TE TOCA",
     ib_empty: "Bandeja vacía. Nada te espera.",
 
     empty_no_hooks: &[

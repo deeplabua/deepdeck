@@ -261,6 +261,8 @@ pub struct Strings {
     pub notes_questions: &'static str,
     pub notes_ideas: &'static str,
     pub notes_tasks: &'static str,
+    /// Project screen group of handoffs (lowercase, like the other groups).
+    pub notes_handoffs: &'static str,
     pub last_session: &'static str,
     /// Label of the single line listing projects with nothing to show.
     pub quiet: &'static str,
@@ -276,6 +278,7 @@ pub struct Strings {
     pub kind_task: &'static str,
     pub kind_question: &'static str,
     pub kind_idea: &'static str,
+    pub kind_handoff: &'static str,
     pub input_hint: &'static str,
     pub edit_label: &'static str,
     /// After `y`: "copied · pbcopy".
@@ -316,6 +319,8 @@ pub struct Strings {
     pub ib_waiting: &'static str,
     pub ib_questions: &'static str,
     pub ib_ideas: &'static str,
+    /// Inbox section: what only the user can do or check.
+    pub ib_handoffs: &'static str,
     pub ib_empty: &'static str,
 
     pub empty_no_hooks: &'static [&'static str],

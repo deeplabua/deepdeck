@@ -4,6 +4,23 @@ All notable changes to DeepDeck are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.6.0 — 2026-11-11
+
+### Added
+
+- **Your part.** `ddeck handoff "…" [--run '<command>']` hands the user a step only they can take — a check
+  on a device, a login, a decision, a command the agent may not run. It shows in the Inbox right after
+  waiting agents, and in the project, with its command as `$ …`: `y` or a click copies it, DeepDeck never
+  runs it. `ddeck list` shows them to agents; `ddeck done <id>` closes one.
+
+### Changed
+
+- **Agent instructions (block v7):** run each `ddeck` command as its own shell call. Chained with a push or a
+  deploy, a board update was lost whenever the permission check refused the whole line.
+- **Agent instructions (block v7):** the reply that ends a piece of work names what is left — not verified, put off,
+  or for the user to do or check; the user's part goes to `ddeck handoff`, later work to ideas — not to the plan,
+  which the next plan replaces. The roadmap is for the project's own next steps.
+
 ## 0.5.0 — 2026-11-09
 
 ### Added

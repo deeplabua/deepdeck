@@ -35,7 +35,7 @@ pub struct ProjectView {
     pub meta: ProjectMeta,
     /// One per Claude Code session, most recently active first.
     pub agents: Vec<AgentView>,
-    /// Open manual notes (tasks, questions, ideas) in creation order.
+    /// Open manual notes (tasks, questions, ideas, handoffs) in creation order.
     pub notes: Vec<Note>,
     /// Notes marked done, most recently done first. They stay visible (and can
     /// be reopened); only `note.delete` removes a note.
@@ -179,4 +179,6 @@ pub struct Note {
     pub created: Timestamp,
     /// When it was marked done (only for notes in `done_notes`).
     pub done_at: Option<Timestamp>,
+    /// Command for the user to run (handoffs only).
+    pub run: Option<String>,
 }

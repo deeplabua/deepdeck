@@ -22,6 +22,7 @@ pub const UK: Strings = Strings {
     notes_questions: "питання",
     notes_ideas: "ідеї",
     notes_tasks: "завдання",
+    notes_handoffs: "за вами",
     last_session: "минула сесія:",
     quiet: "простоюють",
     more_done: |n| format!("+ {n} готово"),
@@ -37,6 +38,7 @@ pub const UK: Strings = Strings {
     kind_task: "завдання",
     kind_question: "питання",
     kind_idea: "ідея",
+    kind_handoff: "за вами",
     input_hint: "tab проєкт · ↵ зберегти · esc скасувати",
     edit_label: "редагування",
     copied: |how| format!("скопійовано · {how}"),
@@ -103,6 +105,7 @@ pub const UK: Strings = Strings {
     ib_waiting: "ЧЕКАЮТЬ НА ВАС",
     ib_questions: "ВІДКРИТІ ПИТАННЯ",
     ib_ideas: "ІДЕЇ НА ПОТІМ",
+    ib_handoffs: "ЗА ВАМИ",
     ib_empty: "Вхідні порожні. На вас нічого не чекає.",
 
     empty_no_hooks: &[

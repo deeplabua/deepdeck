@@ -134,6 +134,7 @@ mod tests {
                 id: id.into(),
                 note_type: NoteType::Idea,
                 text: id.into(),
+                run: None,
             },
         )
     }

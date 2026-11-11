@@ -137,6 +137,10 @@ pub enum EventBody {
         #[serde(rename = "type")]
         note_type: NoteType,
         text: String,
+        /// A command for the user to run themselves (`handoff` notes; added
+        /// after v1 shipped, optional). DeepDeck shows and copies it, never runs it.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        run: Option<String>,
     },
 
     #[serde(rename = "note.update")]
@@ -224,6 +228,9 @@ pub enum NoteType {
     Task,
     Question,
     Idea,
+    /// Something only the user can do or check: on a device, with an account,
+    /// a command the agent may not run. Older readers skip these lines.
+    Handoff,
 }
 
 /// Session id used for agent CLI calls made outside a Claude Code session
@@ -291,11 +298,38 @@ mod tests {
                 id: "n_1".into(),
                 note_type: NoteType::Idea,
                 text: "export to Bitwarden JSON".into(),
+                run: None,
             },
         );
         let s = serde_json::to_string(&e).unwrap();
         assert!(s.contains(r#""kind":"note.add","data":{"id":"n_1","type":"idea""#));
         assert_eq!(parse_line(&s), Some(e));
+    }
+
+    #[test]
+    fn handoff_with_command_round_trip() {
+        let e = Event::new(
+            ts(),
+            Source::Agent,
+            Some("s".into()),
+            EventBody::NoteAdd {
+                id: "n_2".into(),
+                note_type: NoteType::Handoff,
+                text: "Allow board commands".into(),
+                run: Some("sh allow.sh".into()),
+            },
+        );
+        let s = serde_json::to_string(&e).unwrap();
+        assert!(
+            s.contains(r#""type":"handoff","text":"Allow board commands","run":"sh allow.sh""#)
+        );
+        assert_eq!(parse_line(&s), Some(e));
+        // Lines written before `run` existed still parse.
+        let old = r#"{"v":1,"ts":"2026-10-31T06:22:04Z","src":"user","kind":"note.add","data":{"id":"n_1","type":"idea","text":"x"}}"#;
+        assert!(matches!(
+            parse_line(old).unwrap().body,
+            EventBody::NoteAdd { run: None, .. }
+        ));
     }
 
     #[test]

@@ -44,13 +44,13 @@ pub fn recent(board: Board, now: Timestamp, hours: Option<i64>) -> Board {
     }
 }
 
-/// One number for a status bar: agents waiting for you + open questions.
+/// One number for a status bar: agents waiting for you + open questions and handoffs.
 pub fn render_short(board: &Board) -> String {
     let questions = board
         .projects
         .iter()
         .flat_map(|p| &p.notes)
-        .filter(|n| n.note_type == NoteType::Question)
+        .filter(|n| matches!(n.note_type, NoteType::Question | NoteType::Handoff))
         .count();
     (board.waiting_count() + questions).to_string()
 }
@@ -165,8 +165,12 @@ fn render_notes(out: &mut String, p: &ProjectView, style: &Style) {
             NoteType::Question => style.paint("36", "?"),
             NoteType::Idea => style.paint("33", "◆"),
             NoteType::Task => "○".to_owned(),
+            NoteType::Handoff => style.paint("33", "→"),
         };
         let _ = writeln!(out, "  {m} {}", truncate_chars(&n.text, 70));
+        if let Some(run) = &n.run {
+            let _ = writeln!(out, "    {} {run}", style.paint("36", "$"));
+        }
     }
 }
 

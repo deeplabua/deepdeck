@@ -453,6 +453,7 @@ fn draw_projects(
 fn show_selectable(f: &mut Frame<'_>, area: Rect, app: &mut App, r: projects::Rendered) {
     let rows = r.items;
     app.rows = rows.clone();
+    app.copy_rows = r.copy_rows;
     app.body_top = area.y;
     app.set_items(rows.iter().map(|(i, _)| i.clone()).collect());
 
@@ -492,6 +493,7 @@ fn draw_footer(
             NoteType::Task => t.kind_task,
             NoteType::Question => t.kind_question,
             NoteType::Idea => t.kind_idea,
+            NoteType::Handoff => t.kind_handoff,
         };
         let project = app
             .board

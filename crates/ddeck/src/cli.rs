@@ -302,6 +302,27 @@ pub fn summary_show(ctx: &Ctx, limit: usize) -> Result<String> {
 const SUMMARY_MAX_CHARS: usize = 600;
 
 pub fn add_note(ctx: &Ctx, note_type: NoteType, text: &str) -> Result<String> {
+    write_note(ctx, note_type, text, None)
+}
+
+/// Something only the user can do or check, optionally with a command for them
+/// to run. The command is shown and copied, never run by DeepDeck.
+pub fn handoff(ctx: &Ctx, text: &str, run: Option<&str>, force: bool) -> Result<String> {
+    let run = run.map(str::trim).filter(|r| !r.is_empty());
+    if let Some(why) = run
+        .and_then(deepdeck_core::runbook::secret_in)
+        .filter(|_| !force)
+    {
+        bail!(
+            "not saved: the command seems to contain {why}. Refer to secrets \
+             (dv run --item <entry> --sh '…\"$NAME\"…', or $NAME from the environment). \
+             If it is not a secret, add --force"
+        );
+    }
+    write_note(ctx, NoteType::Handoff, text, run.map(str::to_owned))
+}
+
+fn write_note(ctx: &Ctx, note_type: NoteType, text: &str, run: Option<String>) -> Result<String> {
     let text = deepdeck_core::hooks::collapse_ws(text);
     if text.is_empty() {
         bail!("empty text");
@@ -311,13 +332,18 @@ pub fn add_note(ctx: &Ctx, note_type: NoteType, text: &str) -> Result<String> {
         id: id.clone(),
         note_type,
         text,
+        run,
     })?;
-    let kind = match note_type {
+    Ok(format!("{} {id} · {}", kind_name(note_type), ctx.meta.name))
+}
+
+fn kind_name(t: NoteType) -> &'static str {
+    match t {
         NoteType::Task => "task",
         NoteType::Question => "question",
         NoteType::Idea => "idea",
-    };
-    Ok(format!("{kind} {id} · {}", ctx.meta.name))
+        NoteType::Handoff => "handoff",
+    }
 }
 
 pub fn done(ctx: &Ctx, id: &str) -> Result<String> {
@@ -361,8 +387,9 @@ pub fn render_list(view: &ProjectView, session: &str, as_json: bool) -> String {
             })).collect::<Vec<_>>(),
             "notes": view.notes.iter().map(|n| json!({
                 "id": n.id,
-                "type": match n.note_type { NoteType::Task => "task", NoteType::Question => "question", NoteType::Idea => "idea" },
-                "text": n.text
+                "type": kind_name(n.note_type),
+                "text": n.text,
+                "run": n.run
             })).collect::<Vec<_>>(),
         });
         return format!(
@@ -416,8 +443,12 @@ pub fn render_list(view: &ProjectView, session: &str, as_json: bool) -> String {
             NoteType::Question => "?",
             NoteType::Idea => "◆",
             NoteType::Task => "○",
+            NoteType::Handoff => "→",
         };
         out.push_str(&format!("{m} {}  {}\n", n.id, n.text));
+        if let Some(run) = &n.run {
+            out.push_str(&format!("    $ {run}\n"));
+        }
     }
     if plan.is_empty()
         && view.notes.is_empty()
@@ -638,6 +669,29 @@ mod tests {
             session: session.into(),
             src: Source::Agent,
         }
+    }
+
+    #[test]
+    fn handoff_with_command_in_list() {
+        let d = tmp("handoff");
+        let c = ctx(&d, "s1");
+        let out = handoff(&c, "Allow  board commands", Some(" sh allow.sh "), false).unwrap();
+        assert!(out.starts_with("handoff n_"), "{out}");
+        let id = out.split_whitespace().nth(1).unwrap().to_owned();
+        assert_eq!(
+            list(&c, false).unwrap(),
+            format!("repo\n→ {id}  Allow board commands\n    $ sh allow.sh\n")
+        );
+        let v: serde_json::Value = serde_json::from_str(&list(&c, true).unwrap()).unwrap();
+        assert_eq!(v["notes"][0]["type"], "handoff");
+        assert_eq!(v["notes"][0]["run"], "sh allow.sh");
+        // A pasted secret is refused unless forced; an empty --run is no command.
+        let secret = "curl -H 'Authorization: Bearer ghp_0123456789abcdefghijklmnopqrstuvwxyzAB' x";
+        assert!(handoff(&c, "call it", Some(secret), false).is_err());
+        assert!(handoff(&c, "call it", Some(secret), true).is_ok());
+        handoff(&c, "Check on the phone", Some("  "), false).unwrap();
+        assert!(list(&c, false).unwrap().ends_with("Check on the phone\n"));
+        assert_eq!(done(&c, &id).unwrap(), format!("done {id}"));
     }
 
     #[test]

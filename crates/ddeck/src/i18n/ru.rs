@@ -22,6 +22,7 @@ pub const RU: Strings = Strings {
     notes_questions: "вопросы",
     notes_ideas: "идеи",
     notes_tasks: "задачи",
+    notes_handoffs: "за вами",
     last_session: "прошлая сессия:",
     quiet: "простаивают",
     more_done: |n| format!("+ {n} готово"),
@@ -37,6 +38,7 @@ pub const RU: Strings = Strings {
     kind_task: "задача",
     kind_question: "вопрос",
     kind_idea: "идея",
+    kind_handoff: "за вами",
     input_hint: "tab проект · ↵ сохранить · esc отмена",
     edit_label: "правка",
     copied: |how| format!("скопировано · {how}"),
@@ -103,6 +105,7 @@ pub const RU: Strings = Strings {
     ib_waiting: "ЖДУТ ВАС",
     ib_questions: "ОТКРЫТЫЕ ВОПРОСЫ",
     ib_ideas: "ИДЕИ НА ПОТОМ",
+    ib_handoffs: "ЗА ВАМИ",
     ib_empty: "Входящие пусты. Вас ничего не ждёт.",
 
     empty_no_hooks: &[

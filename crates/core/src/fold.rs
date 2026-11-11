@@ -79,6 +79,7 @@ pub fn fold_project(meta: ProjectMeta, events: &[Event]) -> ProjectView {
                 id,
                 note_type,
                 text,
+                run,
             } => {
                 notes.retain(|n| &n.id != id);
                 done_notes.retain(|n| &n.id != id);
@@ -88,6 +89,7 @@ pub fn fold_project(meta: ProjectMeta, events: &[Event]) -> ProjectView {
                     text: text.clone(),
                     created: e.ts,
                     done_at: None,
+                    run: run.clone(),
                 });
             }
             EventBody::NoteUpdate { id, text } => {
@@ -583,6 +585,7 @@ mod tests {
                     id: "n1".into(),
                     note_type: NoteType::Idea,
                     text: "a".into(),
+                    run: None,
                 },
             ),
             user(
@@ -591,6 +594,7 @@ mod tests {
                     id: "n2".into(),
                     note_type: NoteType::Question,
                     text: "b".into(),
+                    run: None,
                 },
             ),
             user(

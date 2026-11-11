@@ -22,6 +22,7 @@ pub const JA: Strings = Strings {
     notes_questions: "質問",
     notes_ideas: "アイデア",
     notes_tasks: "タスク",
+    notes_handoffs: "あなたの番",
     last_session: "前回のセッション:",
     quiet: "待機中",
     more_done: |n| format!("+ 完了 {n} 件"),
@@ -37,6 +38,7 @@ pub const JA: Strings = Strings {
     kind_task: "タスク",
     kind_question: "質問",
     kind_idea: "アイデア",
+    kind_handoff: "あなたの番",
     input_hint: "tab プロジェクト · ↵ 保存 · esc キャンセル",
     edit_label: "編集",
     copied: |how| format!("コピーしました · {how}"),
@@ -103,6 +105,7 @@ pub const JA: Strings = Strings {
     ib_waiting: "あなたの返答待ち",
     ib_questions: "未解決の質問",
     ib_ideas: "あとで検討するアイデア",
+    ib_handoffs: "あなたの番",
     ib_empty: "受信箱は空です。待っているものはありません。",
 
     empty_no_hooks: &[

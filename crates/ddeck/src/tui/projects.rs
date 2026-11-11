@@ -104,6 +104,23 @@ pub struct Rendered {
     pub lines: Vec<Line<'static>>,
     /// Selectable items in screen order, with the row each one starts at.
     pub items: Vec<(Item, usize)>,
+    /// Rows that copy a command when clicked (a handoff's `$ …` line).
+    pub copy_rows: Vec<(usize, String)>,
+}
+
+/// A handoff's command under its text (`$` in the text's column), copied by a click.
+pub fn run_line(r: &mut Rendered, column: usize, run: &str, th: &Theme, width: usize) {
+    r.copy_rows.push((r.lines.len(), run.to_owned()));
+    r.lines.push(row(
+        vec![
+            Span::raw(" ".repeat(column)),
+            Span::styled("$ ", th.question()),
+        ],
+        run,
+        th.dim(),
+        None,
+        width,
+    ));
 }
 
 pub fn layout_projects(
@@ -202,12 +219,13 @@ pub fn item_text(p: &ProjectView, item: &Item, t: &Strings) -> Option<String> {
         Item::Prompt(_) => head?.last_prompt.clone(),
         Item::Recap(_) => resting_line(p, head?, t).map(|(_, text)| text.to_owned()),
         Item::Roadmap(_, n) => p.roadmap.get(n.checked_sub(1)?).map(|s| s.subject.clone()),
+        // A handoff with a command copies the command: that is what gets pasted.
         Item::Note(_, id) => p
             .notes
             .iter()
             .chain(&p.done_notes)
             .find(|n| &n.id == id)
-            .map(|n| n.text.clone()),
+            .map(|n| n.run.clone().unwrap_or_else(|| n.text.clone())),
         Item::Command(_, name) => p
             .commands
             .iter()
@@ -447,6 +465,7 @@ fn project_block(
 
     // ── notes, grouped like plan and roadmap: questions, ideas, tasks ──
     for (note_type, title, mark, style) in [
+        (NoteType::Handoff, t.notes_handoffs, "→ ", th.waiting()),
         (NoteType::Question, t.notes_questions, "? ", th.question()),
         (NoteType::Idea, t.notes_ideas, "◆ ", th.idea()),
         (NoteType::Task, t.notes_tasks, "○ ", th.dim()),
@@ -484,6 +503,9 @@ fn project_block(
                 None,
                 width,
             );
+            if let Some(run) = &n.run {
+                run_line(r, 7, run, th, width);
+            }
         }
         // Done notes stay, dimmed and reopenable with ␣; the oldest fold away.
         let fold =
@@ -606,6 +628,7 @@ mod tests {
                 id: id.into(),
                 note_type,
                 text: text.into(),
+                run: None,
             },
         )
     }
@@ -798,6 +821,7 @@ mod tests {
                 id: "n1".into(),
                 note_type: NoteType::Idea,
                 text: "zstd".into(),
+                run: None,
             },
         );
         let b = fold([(

@@ -22,6 +22,7 @@ pub const KO: Strings = Strings {
     notes_questions: "질문",
     notes_ideas: "아이디어",
     notes_tasks: "할 일",
+    notes_handoffs: "내 차례",
     last_session: "지난 세션:",
     quiet: "유휴",
     more_done: |n| format!("+ 완료 {n}개"),
@@ -37,6 +38,7 @@ pub const KO: Strings = Strings {
     kind_task: "할 일",
     kind_question: "질문",
     kind_idea: "아이디어",
+    kind_handoff: "내 차례",
     input_hint: "tab 프로젝트 · ↵ 저장 · esc 취소",
     edit_label: "편집",
     copied: |how| format!("복사됨 · {how}"),
@@ -103,6 +105,7 @@ pub const KO: Strings = Strings {
     ib_waiting: "응답 대기 중",
     ib_questions: "열린 질문",
     ib_ideas: "나중에 볼 아이디어",
+    ib_handoffs: "내 차례",
     ib_empty: "받은함이 비었습니다. 기다리는 것이 없습니다.",
 
     empty_no_hooks: &[

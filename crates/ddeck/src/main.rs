@@ -120,7 +120,22 @@ enum Command {
         #[arg(long, value_name = "PATH")]
         project: Option<PathBuf>,
     },
-    /// Close a task, question or idea by id.
+    /// Hand something to the user: a check or step only they can do (on a device,
+    /// with an account, a decision), or a command for them to run (`--run`).
+    /// It shows under "Your part" on the board until they mark it done.
+    Handoff {
+        text: String,
+        /// A command for the user to run themselves; DeepDeck never runs it.
+        /// Refer to secrets (`dv run --item …`, `$NAME`), never paste them.
+        #[arg(long, value_name = "COMMAND")]
+        run: Option<String>,
+        /// Save even if the command looks like it contains a secret.
+        #[arg(long)]
+        force: bool,
+        #[arg(long, value_name = "PATH")]
+        project: Option<PathBuf>,
+    },
+    /// Close a task, question, idea or handoff by id.
     Done {
         id: String,
         #[arg(long, value_name = "PATH")]
@@ -376,6 +391,12 @@ fn run(command: Command) -> Result<ExitCode> {
         Command::Idea { text, project } => {
             say(cli::add_note(&ctx(project)?, NoteType::Idea, &text)?)
         }
+        Command::Handoff {
+            text,
+            run,
+            force,
+            project,
+        } => say(cli::handoff(&ctx(project)?, &text, run.as_deref(), force)?),
         Command::Done { id, project } => say(cli::done(&ctx(project)?, &id)?),
         Command::List { json, project } => {
             print!("{}", cli::list(&ctx(project)?, json)?);
