@@ -130,6 +130,30 @@ The board reloads itself when the binary changes, so an upgrade does not need a 
 For a status bar (tmux, herdr), `ddeck status --short` prints one number: agents waiting for you plus
 open questions. `ddeck status` prints the whole board as text.
 
+### Finding a conversation
+
+"Which agent was it where we talked about keywords?" — `ddeck find` searches every project at once: your
+messages, the agents' replies and summaries, notes, plans, roadmaps and saved commands, the archive
+included. All words must occur; endings are ignored, so `keywords` also finds `keyword`.
+
+```
+$ ddeck find keywords aso
+3 matches in 1 place
+
+DeepShrink · session 76baef01 · 11-09 – 11-11 09:30
+  11-11 09:30  agent    ASO is more than the description and keywords. Apple decides where to show the app…
+  11-11 09:29  you      how does ASO promotion work? is it just descriptions and keywords, or something else?
+  11-09 12:07  you      how can we find out which keywords users found us by?
+  resume: cd ~/Projects/DeepShrink && claude --resume 76baef01-9fbe-4002-bf2f-b5a60d8160e7
+```
+
+On the board, press `/`: type the words, `↵` moves to the results, then `↵` opens the project, `o` jumps to
+the agent (in herdr), `y` copies the `claude --resume` command, `/` edits the words, `esc` closes.
+
+In a terminal: newest first, a few matches per session; `--all` shows everything, `-p <project>` narrows to
+one project, `--json` is for scripts. It searches what the board keeps — your messages as saved (first 200 characters)
+and the agents' short recaps, not the full transcripts.
+
 ## Languages
 
 The board and the screens you read (`status`, `doctor`, `setup`) speak English, Deutsch, Español,

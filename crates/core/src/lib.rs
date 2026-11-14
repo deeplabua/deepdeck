@@ -10,6 +10,7 @@ pub mod hooks;
 pub mod model;
 pub mod project;
 pub mod runbook;
+pub mod search;
 pub mod store;
 
 pub use event::{Event, EventBody, NoteType, Source, TaskStatus};

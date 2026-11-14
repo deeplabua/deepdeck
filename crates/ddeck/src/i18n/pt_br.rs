@@ -68,6 +68,7 @@ pub const PT_BR: Strings = Strings {
     keys: &[
         ("o", "agente"),
         ("y", "copiar"),
+        ("/", "buscar"),
         ("s", "ordem"),
         ("f", "filtro"),
         ("a", "tarefa"),
@@ -81,12 +82,14 @@ pub const PT_BR: Strings = Strings {
     ],
     keys_timeline: &[
         ("j/k", "rolar"),
+        ("/", "buscar"),
         ("f", "este projeto / todos"),
         ("q", "sair"),
     ],
     keys_inbox: &[
         ("o", "agente"),
         ("y", "copiar"),
+        ("/", "buscar"),
         ("f", "filtro"),
         ("↵", "abrir"),
         ("␣", "resolvido"),
@@ -96,6 +99,25 @@ pub const PT_BR: Strings = Strings {
         ("i", "ideia"),
         ("q", "sair"),
     ],
+    keys_search: &[
+        ("↵", "projeto"),
+        ("o", "agente"),
+        ("y", "resume"),
+        ("/", "editar"),
+        ("esc", "fechar"),
+    ],
+    search_hint: "palavras · ↵ resultados · esc fechar",
+    search_start: "Busca o que você e os agentes disseram, em todos os projetos.",
+    search_none: "Nada encontrado.",
+    search_ended: "encerrada",
+    search_board: "quadro",
+    search_found: |m, s| {
+        format!(
+            "{m} {} em {s} {}",
+            if m == 1 { "resultado" } else { "resultados" },
+            if s == 1 { "lugar" } else { "lugares" }
+        )
+    },
 
     tl_plan: |n| {
         if n == 1 {

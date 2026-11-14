@@ -62,6 +62,7 @@ pub const KO: Strings = Strings {
     keys: &[
         ("o", "에이전트"),
         ("y", "복사"),
+        ("/", "검색"),
         ("s", "정렬"),
         ("f", "필터"),
         ("a", "할 일"),
@@ -75,12 +76,14 @@ pub const KO: Strings = Strings {
     ],
     keys_timeline: &[
         ("j/k", "스크롤"),
+        ("/", "검색"),
         ("f", "이 프로젝트 / 전체"),
         ("q", "종료"),
     ],
     keys_inbox: &[
         ("o", "에이전트"),
         ("y", "복사"),
+        ("/", "검색"),
         ("f", "필터"),
         ("↵", "열기"),
         ("␣", "해결"),
@@ -90,6 +93,19 @@ pub const KO: Strings = Strings {
         ("i", "아이디어"),
         ("q", "종료"),
     ],
+    keys_search: &[
+        ("↵", "프로젝트"),
+        ("o", "에이전트"),
+        ("y", "resume"),
+        ("/", "편집"),
+        ("esc", "닫기"),
+    ],
+    search_hint: "단어 · ↵ 결과로 · esc 닫기",
+    search_start: "나와 에이전트가 한 말을 모든 프로젝트에서 검색합니다.",
+    search_none: "찾은 항목이 없습니다.",
+    search_ended: "종료됨",
+    search_board: "보드",
+    search_found: |m, s| format!("{s}곳에서 {m}건"),
 
     tl_plan: |n| format!("계획: {n}단계"),
     tl_roadmap: |n| format!("로드맵: {n}단계"),

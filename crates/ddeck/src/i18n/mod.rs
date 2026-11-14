@@ -296,6 +296,19 @@ pub struct Strings {
     pub keys: &'static [(&'static str, &'static str)],
     pub keys_timeline: &'static [(&'static str, &'static str)],
     pub keys_inbox: &'static [(&'static str, &'static str)],
+    /// Footer of the search screen (`/`) once the cursor is in the results.
+    pub keys_search: &'static [(&'static str, &'static str)],
+    /// Footer while typing the search words.
+    pub search_hint: &'static str,
+    /// Search screen before anything is typed.
+    pub search_start: &'static str,
+    pub search_none: &'static str,
+    /// A session that has ended (search results).
+    pub search_ended: &'static str,
+    /// Hits not tied to a session: notes and commands posted from a terminal.
+    pub search_board: &'static str,
+    /// "4 matches in 2 places".
+    pub search_found: fn(usize, usize) -> String,
 
     /// "plan: 3 steps".
     pub tl_plan: fn(usize) -> String,

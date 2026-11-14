@@ -70,6 +70,8 @@ pub struct App {
     pub notices: Vec<crate::update::Notice>,
     /// Screen row of the first notice, from the last draw (clicks copy its command).
     pub notice_top: u16,
+    /// The search screen (`/`), over whatever screen was open.
+    pub search: Option<super::search::Search>,
 }
 
 impl App {
@@ -94,6 +96,7 @@ impl App {
             order: Order::default(),
             notices: Vec::new(),
             notice_top: u16::MAX,
+            search: None,
         }
     }
 
@@ -186,6 +189,26 @@ impl App {
         {
             return Some(Effect::Quit);
         }
+        if let Some(search) = &mut self.search {
+            use super::search::Outcome;
+            return match search.handle(key) {
+                Outcome::Stay => None,
+                Outcome::Close => {
+                    self.search = None;
+                    None
+                }
+                Outcome::Open(i) => {
+                    let id = search.groups[i].meta.id.clone();
+                    self.search = None;
+                    self.screen = Screen::Projects;
+                    self.only = None;
+                    self.selected = Some(Item::Project(id));
+                    None
+                }
+                Outcome::Focus(i) => self.focus_group(i),
+                Outcome::Copy(i) => Some(Effect::Copy(super::search::copy_text(&search.groups[i]))),
+            };
+        }
         if let Some(input) = &mut self.input {
             return match input.handle(key) {
                 InputOutcome::Continue => None,
@@ -240,6 +263,7 @@ impl App {
                 }
             }
             KeyCode::Char('f') => self.toggle_only(),
+            KeyCode::Char('/') => self.search = Some(super::search::Search::new()),
             KeyCode::Char('u') if !self.notices.is_empty() => {
                 return Some(Effect::Copy(crate::update::command(&self.notices[0])));
             }
@@ -294,7 +318,7 @@ impl App {
     /// Click selects a line, a click on the selected line opens or closes it,
     /// the wheel moves the cursor (scrolls the Timeline), a click on a tab switches.
     pub fn handle_mouse(&mut self, ev: MouseEvent) -> Option<Effect> {
-        if self.input.is_some() {
+        if self.input.is_some() || self.search.is_some() {
             return None;
         }
         match ev.kind {
@@ -387,6 +411,22 @@ impl App {
         .or_else(|| p.headline());
         Some(Effect::Focus {
             pane: agent.and_then(|a| a.herdr_pane.clone()),
+            root: p.meta.root.clone(),
+        })
+    }
+
+    /// `o` on a search result: the session's agent, if it is still on the board.
+    fn focus_group(&self, i: usize) -> Option<Effect> {
+        let g = self.search.as_ref()?.groups.get(i)?;
+        let session = g.session.as_ref().filter(|_| !g.ended)?;
+        let p = self
+            .board
+            .projects
+            .iter()
+            .find(|p| p.meta.id == g.meta.id)?;
+        let agent = p.agents.iter().find(|a| &a.session == session)?;
+        Some(Effect::Focus {
+            pane: agent.herdr_pane.clone(),
             root: p.meta.root.clone(),
         })
     }

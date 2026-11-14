@@ -3,6 +3,7 @@
 mod cli;
 mod clipboard;
 mod doctor;
+mod find;
 mod herdr;
 mod hook;
 mod i18n;
@@ -147,6 +148,21 @@ enum Command {
         json: bool,
         #[arg(long, value_name = "PATH")]
         project: Option<PathBuf>,
+    },
+    /// Find which session talked about something, across all projects: your
+    /// messages, agent replies, summaries, notes, plans, roadmaps (archive included).
+    Find {
+        /// Words that must all occur (endings are ignored: "keywords" finds "keyword").
+        #[arg(required = true)]
+        words: Vec<String>,
+        /// Only this project (name, id or path).
+        #[arg(long, short)]
+        project: Option<String>,
+        /// Every place and every match, not just the newest.
+        #[arg(long)]
+        all: bool,
+        #[arg(long)]
+        json: bool,
     },
     /// Print the CLAUDE.md block that `setup` installs.
     Snippet,
@@ -403,6 +419,18 @@ fn run(command: Command) -> Result<ExitCode> {
             if !json {
                 print!("{}", update::for_terminal());
             }
+            Ok(ExitCode::SUCCESS)
+        }
+        Command::Find {
+            words,
+            project,
+            all,
+            json,
+        } => {
+            print!(
+                "{}",
+                find::find(&paths()?, &words, project.as_deref(), all, json)?
+            );
             Ok(ExitCode::SUCCESS)
         }
         Command::Snippet => say(setup::block()),

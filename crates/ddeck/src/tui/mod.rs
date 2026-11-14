@@ -7,6 +7,7 @@ mod app;
 mod inbox;
 mod input;
 mod projects;
+mod search;
 mod select;
 mod source;
 pub(crate) mod strings;
@@ -61,6 +62,9 @@ pub fn run(paths: Paths, settings_path: &Path) -> Result<()> {
         hooks_installed,
     );
     app.set_order(load_order(&source.paths().tui_prefs()));
+    app.only = load_only(&source.paths().tui_prefs());
+    // `f` survives a restart (an update reloads the board): saved when it changes.
+    let mut saved_only = app.only.clone();
     app.notices = crate::update::notices(hooks_installed);
     let mut ticks: u32 = 0;
 
@@ -160,11 +164,24 @@ pub fn run(paths: Paths, settings_path: &Path) -> Result<()> {
                     None => {}
                 }
             }
+            if app.only != saved_only {
+                if let Err(e) = save_only(&source.paths().tui_prefs(), app.only.as_ref()) {
+                    message = Some(format!("{e}"));
+                    message_until = std::time::Instant::now() + MESSAGE_FOR;
+                }
+                saved_only = app.only.clone();
+            }
             // A message lives a few seconds, not until the next key press.
             if had_effect && message.is_some() {
                 message_until = std::time::Instant::now() + MESSAGE_FOR;
             } else if message.is_some() && std::time::Instant::now() >= message_until {
                 message = None;
+            }
+            // The search screen reads every log once, when it opens.
+            if let Some(s) = &mut app.search
+                && s.corpus.is_none()
+            {
+                s.corpus = Some(crate::find::load_all(source.paths()).unwrap_or_default());
             }
             if source.poll()? {
                 app.set_board(source.board(Timestamp::now(), ACTIVE_HOURS));
@@ -262,6 +279,19 @@ fn save_order(path: &Path, order: deepdeck_core::Order) -> std::io::Result<()> {
     crate::i18n::set_pref(path, "order", Some(value))
 }
 
+/// The project `f` narrowed the board to, if any.
+fn load_only(path: &Path) -> Option<deepdeck_core::ProjectId> {
+    std::fs::read(path)
+        .ok()
+        .and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok())
+        .and_then(|v| serde_json::from_value(v["only"].clone()).ok())
+}
+
+fn save_only(path: &Path, only: Option<&deepdeck_core::ProjectId>) -> std::io::Result<()> {
+    let value = only.map(|id| serde_json::Value::String(id.0.clone()));
+    crate::i18n::set_pref(path, "only", value)
+}
+
 /// Replace this process with the freshly installed binary, same arguments.
 fn reload() -> Result<()> {
     let exe = std::env::current_exe()?;
@@ -312,6 +342,11 @@ fn draw(
     f.render_widget(Paragraph::new(lines), notices);
     app.notice_top = notices.y;
     draw_header(f, header, app, t, th);
+    if app.search.is_some() {
+        draw_search(f, body, app, t, th);
+        draw_footer(f, footer, app, message, t, th);
+        return;
+    }
     match app.screen {
         Screen::Projects => draw_projects(f, body, app, now, t, th),
         Screen::Timeline => {
@@ -342,6 +377,33 @@ fn draw(
         }
     }
     draw_footer(f, footer, app, message, t, th);
+}
+
+fn draw_search(f: &mut Frame<'_>, area: Rect, app: &mut App, t: &Strings, th: &Theme) {
+    let Some(s) = app.search.as_mut() else {
+        return;
+    };
+    s.refresh();
+    let (lines, starts) = search::layout(s, area.width, &jiff::tz::TimeZone::system(), t, th);
+    let height = usize::from(area.height);
+    if s.typing {
+        s.scroll = 0;
+    } else if let Some(&row) = starts.get(s.selected) {
+        // The group's header and its matches on screen.
+        let end = starts.get(s.selected + 1).map_or(lines.len(), |n| n - 1);
+        if row < s.scroll {
+            s.scroll = row.saturating_sub(1);
+        } else if end > s.scroll + height {
+            s.scroll = end.saturating_sub(height).min(row);
+        }
+    }
+    let scroll = u16::try_from(s.scroll).unwrap_or(u16::MAX);
+    f.render_widget(Paragraph::new(lines).scroll((scroll, 0)), area);
+    if s.typing {
+        let x = 3 + text::width(s.line.before_cursor());
+        let x = area.x.saturating_add(u16::try_from(x).unwrap_or(u16::MAX));
+        f.set_cursor_position(Position::new(x.min(area.right().saturating_sub(1)), area.y));
+    }
 }
 
 fn draw_header(f: &mut Frame<'_>, area: Rect, app: &mut App, t: &Strings, th: &Theme) {
@@ -563,7 +625,17 @@ fn draw_footer(
         used += text::width(&label);
         spans.push(Span::styled(label, th.accent()));
     }
+    if let Some(s) = &app.search
+        && s.typing
+    {
+        f.render_widget(
+            Paragraph::new(Line::styled(fit_hint(t.search_hint, width), th.dim())),
+            area,
+        );
+        return;
+    }
     let keys = match app.screen {
+        _ if app.search.is_some() => t.keys_search,
         Screen::Projects => t.keys,
         Screen::Timeline => t.keys_timeline,
         Screen::Inbox => t.keys_inbox,
@@ -582,6 +654,10 @@ fn draw_footer(
     f.render_widget(Paragraph::new(Line::from(spans)), area);
 }
 
+fn fit_hint(hint: &str, width: usize) -> String {
+    text::fit(&format!(" {hint}"), width)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -593,8 +669,16 @@ mod tests {
         assert_eq!(load_order(&path), deepdeck_core::Order::Name);
         save_order(&path, deepdeck_core::Order::Attention).unwrap();
         assert_eq!(load_order(&path), deepdeck_core::Order::Attention);
+        let id = deepdeck_core::ProjectId("0123456789ab".into());
+        assert_eq!(load_only(&path), None);
+        save_only(&path, Some(&id)).unwrap();
+        assert_eq!(load_only(&path), Some(id));
+        assert_eq!(load_order(&path), deepdeck_core::Order::Attention, "kept");
+        save_only(&path, None).unwrap();
+        assert_eq!(load_only(&path), None);
         std::fs::write(&path, "garbage").unwrap();
         assert_eq!(load_order(&path), deepdeck_core::Order::Name);
+        assert_eq!(load_only(&path), None);
         std::fs::remove_dir_all(&dir).unwrap();
     }
 

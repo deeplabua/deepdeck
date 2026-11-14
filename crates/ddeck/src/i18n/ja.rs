@@ -62,6 +62,7 @@ pub const JA: Strings = Strings {
     keys: &[
         ("o", "エージェント"),
         ("y", "コピー"),
+        ("/", "検索"),
         ("s", "並び順"),
         ("f", "絞り込み"),
         ("a", "タスク"),
@@ -75,12 +76,14 @@ pub const JA: Strings = Strings {
     ],
     keys_timeline: &[
         ("j/k", "スクロール"),
+        ("/", "検索"),
         ("f", "このプロジェクト / すべて"),
         ("q", "終了"),
     ],
     keys_inbox: &[
         ("o", "エージェント"),
         ("y", "コピー"),
+        ("/", "検索"),
         ("f", "絞り込み"),
         ("↵", "開く"),
         ("␣", "解決"),
@@ -90,6 +93,19 @@ pub const JA: Strings = Strings {
         ("i", "アイデア"),
         ("q", "終了"),
     ],
+    keys_search: &[
+        ("↵", "プロジェクト"),
+        ("o", "エージェント"),
+        ("y", "resume"),
+        ("/", "編集"),
+        ("esc", "閉じる"),
+    ],
+    search_hint: "キーワード · ↵ 結果へ · esc 閉じる",
+    search_start: "あなたとエージェントの発言を全プロジェクトから検索します。",
+    search_none: "見つかりませんでした。",
+    search_ended: "終了",
+    search_board: "ボード",
+    search_found: |m, s| format!("{s} か所で {m} 件"),
 
     tl_plan: |n| format!("計画: {n} ステップ"),
     tl_roadmap: |n| format!("ロードマップ: {n} ステップ"),

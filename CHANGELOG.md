@@ -4,6 +4,22 @@ All notable changes to DeepDeck are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.7.0 — 2026-11-14
+
+### Added
+
+- **`ddeck find <words>`** — which session talked about something, across all projects: your messages, agent
+  replies and summaries, notes, plans, roadmaps and saved commands, the archive included. Grouped by
+  session, newest first, with the `claude --resume` command to get back to it. All words must match;
+  endings are ignored. `--all`, `-p <project>`, `--json`.
+- **Search on the board:** `/` opens the same search inside the TUI. `↵` on a result opens its project, `o`
+  jumps to the agent in herdr, `y` copies `claude --resume` for the session.
+
+### Fixed
+
+- `f` (one project only) is remembered: the board no longer shows every project again after it
+  restarts, for example into a newly installed version.
+
 ## 0.6.2 — 2026-11-12
 
 The 0.6.1 build never ran: a GitHub Actions outage left it queued. 0.6.2 ships the same changes.

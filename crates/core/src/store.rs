@@ -378,6 +378,25 @@ pub fn load_all(paths: &Paths) -> io::Result<Vec<(ProjectMeta, Vec<Event>)>> {
         .collect()
 }
 
+/// A project's events with its archive in front (`archive/<YYYY-MM>.jsonl`,
+/// oldest month first): everything ever logged, in time order.
+pub fn load_with_archive(paths: &Paths, id: &ProjectId) -> io::Result<Vec<Event>> {
+    let log = paths.events(id);
+    let mut months: Vec<PathBuf> = fs::read_dir(log.with_file_name("archive"))
+        .map(|d| {
+            d.filter_map(|e| e.ok().map(|e| e.path()))
+                .filter(|p| p.extension().is_some_and(|x| x == "jsonl"))
+                .collect()
+        })
+        .unwrap_or_default();
+    months.sort();
+    let mut events = Vec::new();
+    for m in months.iter().chain(std::iter::once(&log)) {
+        events.extend(read_from(m, 0)?.events);
+    }
+    Ok(events)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

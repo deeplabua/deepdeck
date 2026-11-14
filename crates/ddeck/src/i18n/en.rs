@@ -69,6 +69,7 @@ pub const EN: Strings = Strings {
     keys: &[
         ("o", "agent"),
         ("y", "copy"),
+        ("/", "find"),
         ("s", "sort"),
         ("f", "only"),
         ("a", "task"),
@@ -83,12 +84,14 @@ pub const EN: Strings = Strings {
 
     keys_timeline: &[
         ("j/k", "scroll"),
+        ("/", "find"),
         ("f", "this project / all"),
         ("q", "quit"),
     ],
     keys_inbox: &[
         ("o", "agent"),
         ("y", "copy"),
+        ("/", "find"),
         ("f", "only"),
         ("↵", "open"),
         ("␣", "resolved"),
@@ -98,6 +101,25 @@ pub const EN: Strings = Strings {
         ("i", "idea"),
         ("q", "quit"),
     ],
+    keys_search: &[
+        ("↵", "project"),
+        ("o", "agent"),
+        ("y", "resume"),
+        ("/", "edit"),
+        ("esc", "close"),
+    ],
+    search_hint: "words · ↵ results · esc close",
+    search_start: "Search what you and the agents said, in every project.",
+    search_none: "Nothing found.",
+    search_ended: "ended",
+    search_board: "board",
+    search_found: |m, s| {
+        format!(
+            "{m} {} in {s} {}",
+            if m == 1 { "match" } else { "matches" },
+            if s == 1 { "place" } else { "places" }
+        )
+    },
 
     tl_plan: |n| {
         if n == 1 {
