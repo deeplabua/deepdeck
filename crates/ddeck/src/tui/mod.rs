@@ -62,8 +62,10 @@ pub fn run(paths: Paths, settings_path: &Path) -> Result<()> {
         hooks_installed,
     );
     app.set_order(load_order(&source.paths().tui_prefs()));
-    app.only = load_only(&source.paths().tui_prefs());
-    // `f` survives a restart (an update reloads the board): saved when it changes.
+    // `f` survives a restart (an update reloads the board): saved when it
+    // changes, per directory, since each project's tab may run its own board.
+    let here = board_dir();
+    app.only = load_only(&source.paths().tui_prefs(), &here);
     let mut saved_only = app.only.clone();
     app.notices = crate::update::notices(hooks_installed);
     let mut ticks: u32 = 0;
@@ -165,7 +167,7 @@ pub fn run(paths: Paths, settings_path: &Path) -> Result<()> {
                 }
             }
             if app.only != saved_only {
-                if let Err(e) = save_only(&source.paths().tui_prefs(), app.only.as_ref()) {
+                if let Err(e) = save_only(&source.paths().tui_prefs(), &here, app.only.as_ref()) {
                     message = Some(format!("{e}"));
                     message_until = std::time::Instant::now() + MESSAGE_FOR;
                 }
@@ -279,16 +281,41 @@ fn save_order(path: &Path, order: deepdeck_core::Order) -> std::io::Result<()> {
     crate::i18n::set_pref(path, "order", Some(value))
 }
 
-/// The project `f` narrowed the board to, if any.
-fn load_only(path: &Path) -> Option<deepdeck_core::ProjectId> {
-    std::fs::read(path)
-        .ok()
-        .and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok())
-        .and_then(|v| serde_json::from_value(v["only"].clone()).ok())
+/// Where this board runs: the key its `f` choice is saved under.
+fn board_dir() -> String {
+    std::env::current_dir()
+        .map(|d| d.display().to_string())
+        .unwrap_or_default()
 }
 
-fn save_only(path: &Path, only: Option<&deepdeck_core::ProjectId>) -> std::io::Result<()> {
-    let value = only.map(|id| serde_json::Value::String(id.0.clone()));
+fn read_prefs(path: &Path) -> serde_json::Value {
+    std::fs::read(path)
+        .ok()
+        .and_then(|b| serde_json::from_slice(&b).ok())
+        .unwrap_or_default()
+}
+
+/// The project `f` narrowed the board in `dir` to, if any.
+fn load_only(path: &Path, dir: &str) -> Option<deepdeck_core::ProjectId> {
+    serde_json::from_value(read_prefs(path)["only"][dir].clone()).ok()
+}
+
+/// Boards in other directories keep their own choice. A plain string under
+/// `only` (0.7.0 kept one choice for every board) is dropped.
+fn save_only(
+    path: &Path,
+    dir: &str,
+    only: Option<&deepdeck_core::ProjectId>,
+) -> std::io::Result<()> {
+    let mut map = match read_prefs(path)["only"].take() {
+        serde_json::Value::Object(m) => m,
+        _ => serde_json::Map::new(),
+    };
+    match only {
+        Some(id) => map.insert(dir.to_owned(), id.0.clone().into()),
+        None => map.remove(dir),
+    };
+    let value = (!map.is_empty()).then_some(serde_json::Value::Object(map));
     crate::i18n::set_pref(path, "only", value)
 }
 
@@ -669,16 +696,29 @@ mod tests {
         assert_eq!(load_order(&path), deepdeck_core::Order::Name);
         save_order(&path, deepdeck_core::Order::Attention).unwrap();
         assert_eq!(load_order(&path), deepdeck_core::Order::Attention);
-        let id = deepdeck_core::ProjectId("0123456789ab".into());
-        assert_eq!(load_only(&path), None);
-        save_only(&path, Some(&id)).unwrap();
-        assert_eq!(load_only(&path), Some(id));
+        let (a, b) = (
+            deepdeck_core::ProjectId("aaaaaaaaaaaa".into()),
+            deepdeck_core::ProjectId("bbbbbbbbbbbb".into()),
+        );
+        assert_eq!(load_only(&path, "/p/A"), None);
+        // 0.7.0 saved one choice for every board: ignored, then replaced.
+        crate::i18n::set_pref(&path, "only", Some(a.0.clone().into())).unwrap();
+        assert_eq!(load_only(&path, "/p/A"), None);
+        save_only(&path, "/p/A", Some(&a)).unwrap();
+        save_only(&path, "/p/B", Some(&b)).unwrap();
+        assert_eq!(
+            load_only(&path, "/p/A"),
+            Some(a.clone()),
+            "each board its own"
+        );
+        assert_eq!(load_only(&path, "/p/B"), Some(b));
         assert_eq!(load_order(&path), deepdeck_core::Order::Attention, "kept");
-        save_only(&path, None).unwrap();
-        assert_eq!(load_only(&path), None);
+        save_only(&path, "/p/B", None).unwrap();
+        assert_eq!(load_only(&path, "/p/B"), None);
+        assert_eq!(load_only(&path, "/p/A"), Some(a));
         std::fs::write(&path, "garbage").unwrap();
         assert_eq!(load_order(&path), deepdeck_core::Order::Name);
-        assert_eq!(load_only(&path), None);
+        assert_eq!(load_only(&path, "/p/A"), None);
         std::fs::remove_dir_all(&dir).unwrap();
     }
 

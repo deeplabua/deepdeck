@@ -4,6 +4,14 @@ All notable changes to DeepDeck are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.7.1 — 2026-11-14
+
+### Fixed
+
+- `f` is remembered per board: each board keeps its own project, keyed by the directory it runs in.
+  In 0.7.0 one choice was shared, so boards open in several projects' tabs overwrote each other.
+  Choose once more with `f` after upgrading.
+
 ## 0.7.0 — 2026-11-14
 
 ### Added
