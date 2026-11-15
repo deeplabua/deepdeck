@@ -106,6 +106,16 @@ pub struct Rendered {
     pub items: Vec<(Item, usize)>,
     /// Rows that copy a command when clicked (a handoff's `$ …` line).
     pub copy_rows: Vec<(usize, String)>,
+    /// "+ N more" / "+ N done" rows: a click unfolds them by opening this item.
+    pub fold_rows: Vec<(usize, Item)>,
+}
+
+/// A "+ N more" row folding part of `project`'s list; clicking it unfolds.
+fn fold_line(r: &mut Rendered, project: &ProjectId, text: &str, style: Style, width: usize) {
+    r.fold_rows
+        .push((r.lines.len(), Item::Project(project.clone())));
+    r.lines
+        .push(row(vec![Span::raw("     ")], text, style, None, width));
 }
 
 /// A handoff's command under its text (`$` in the text's column), wrapped in
@@ -369,13 +379,7 @@ fn project_block(
             let fold_done =
                 done > MAX_DONE_SHOWN && !view.open.contains(&Item::Project(p.meta.id.clone()));
             if fold_done {
-                r.lines.push(row(
-                    vec![Span::raw("     ")],
-                    &(t.more_done)(done),
-                    th.done(),
-                    None,
-                    width,
-                ));
+                fold_line(r, &p.meta.id, &(t.more_done)(done), th.done(), width);
             }
             for task in &agent.tasks {
                 let (m, style) = match task.status {
@@ -454,13 +458,7 @@ fn project_block(
         let fold_done =
             done > MAX_DONE_SHOWN && !view.open.contains(&Item::Project(p.meta.id.clone()));
         if fold_done {
-            r.lines.push(row(
-                vec![Span::raw("     ")],
-                &(t.more_done)(done),
-                th.done(),
-                None,
-                width,
-            ));
+            fold_line(r, &p.meta.id, &(t.more_done)(done), th.done(), width);
         }
         for (i, step) in p.roadmap.iter().enumerate() {
             let (m, style) = match step.status {
@@ -550,13 +548,13 @@ fn project_block(
             );
         }
         if fold {
-            r.lines.push(row(
-                vec![Span::raw("     ")],
+            fold_line(
+                r,
+                &p.meta.id,
                 &(t.more_done)(done.len() - shown),
                 th.dim(),
-                None,
                 width,
-            ));
+            );
         }
     }
 
@@ -604,13 +602,13 @@ fn project_block(
             }
         }
         if fold {
-            r.lines.push(row(
-                vec![Span::raw("     ")],
+            fold_line(
+                r,
+                &p.meta.id,
                 &(t.more)(p.commands.len() - shown),
                 th.dim(),
-                None,
                 width,
-            ));
+            );
         }
     }
 }
@@ -889,6 +887,42 @@ mod tests {
                 .iter()
                 .any(|(i, _)| *i == Item::Command(id.clone(), "test".into()))
         );
+        assert!(r.fold_rows.is_empty(), "nothing folded");
+    }
+
+    #[test]
+    fn folded_commands_row_unfolds_the_project() {
+        let idea = Event::new(
+            at(0),
+            Source::User,
+            None,
+            EventBody::NoteAdd {
+                id: "n1".into(),
+                note_type: NoteType::Idea,
+                text: "zstd".into(),
+                run: None,
+            },
+        );
+        // A project with nothing but commands is not on the board: add an idea.
+        let events: Vec<Event> = std::iter::once(idea)
+            .chain((0..5).map(|m| {
+                Event::new(
+                    at(m),
+                    Source::User,
+                    None,
+                    EventBody::CmdSet {
+                        name: format!("c{m}"),
+                        command: "true".into(),
+                    },
+                )
+            }))
+            .collect();
+        let b = fold([(ProjectMeta::for_root(Path::new("/p/x")), events)]);
+        let (lines, r) = render(&b, 40, None);
+        let id = b.projects[0].meta.id.clone();
+        let (row, item) = r.fold_rows[0].clone();
+        assert_eq!(lines[row].trim(), "+ 2 more");
+        assert_eq!(item, Item::Project(id));
     }
 
     #[test]

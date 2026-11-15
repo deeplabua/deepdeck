@@ -50,6 +50,8 @@ pub struct App {
     pub rows: Vec<(Item, usize)>,
     /// Content rows that copy a command when clicked (handoffs' `$ …` lines).
     pub copy_rows: Vec<(usize, String)>,
+    /// "+ N more" rows from the last layout and what a click on one opens.
+    pub fold_rows: Vec<(usize, Item)>,
     /// Screen row where the body starts, and tab hit areas `(screen, x0..x1)`.
     pub body_top: u16,
     pub tabs: Vec<(Screen, std::ops::Range<u16>)>,
@@ -84,6 +86,7 @@ impl App {
             items: Vec::new(),
             rows: Vec::new(),
             copy_rows: Vec::new(),
+            fold_rows: Vec::new(),
             body_top: 1,
             tabs: Vec::new(),
             open: HashSet::new(),
@@ -377,6 +380,11 @@ impl App {
         let line = usize::from(row - self.body_top) + self.scroll;
         if let Some((_, run)) = self.copy_rows.iter().find(|(r, _)| *r == line) {
             return Some(Effect::Copy(run.clone()));
+        }
+        // "+ 12 more": show the rest, not toggle the line above it.
+        if let Some((_, item)) = self.fold_rows.iter().find(|(r, _)| *r == line) {
+            self.open.insert(item.clone());
+            return None;
         }
         // The item whose lines contain the click: the last one starting at or above it.
         let (item, _) = self
@@ -796,6 +804,13 @@ mod tests {
             click(&mut app, 5, 6),
             Some(Effect::Copy("sh allow.sh".into()))
         );
+        // "+ 12 more" unfolds the list instead of toggling the item above it.
+        app.selected = Some(note.clone());
+        let open_before = app.open.contains(&note);
+        app.fold_rows = vec![(6, Item::Project(id.clone()))];
+        assert_eq!(click(&mut app, 5, 7), None);
+        assert!(app.open.contains(&Item::Project(id.clone())));
+        assert_eq!(app.open.contains(&note), open_before);
 
         click(&mut app, 32, 0);
         assert_eq!(app.screen, Screen::Inbox);

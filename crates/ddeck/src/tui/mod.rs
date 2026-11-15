@@ -553,6 +553,7 @@ fn show_selectable(f: &mut Frame<'_>, area: Rect, app: &mut App, r: projects::Re
     let rows = r.items;
     app.rows = rows.clone();
     app.copy_rows = r.copy_rows;
+    app.fold_rows = r.fold_rows;
     app.body_top = area.y;
     app.set_items(rows.iter().map(|(i, _)| i.clone()).collect());
 

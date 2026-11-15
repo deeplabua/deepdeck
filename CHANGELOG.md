@@ -4,6 +4,13 @@ All notable changes to DeepDeck are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.7.2 — 2026-11-15
+
+### Fixed
+
+- Clicking "+ N more" under saved commands (or "+ N done" under a plan or notes) shows the rest of the
+  list. It used to toggle the item above it, so the last command folded and unfolded instead.
+
 ## 0.7.1 — 2026-11-14
 
 ### Fixed
